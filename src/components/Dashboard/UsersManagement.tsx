@@ -39,7 +39,7 @@ export default function UsersManagement({ users: initialUsers }: UsersManagement
     name: '',
     email: '',
     password: '',
-    role: 'FIELD_OFFICER',
+    role: 'COMPLAINANT',
   });
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -58,7 +58,7 @@ export default function UsersManagement({ users: initialUsers }: UsersManagement
         setUsers([...users, newUser]);
         toast.success('User created successfully');
         setCreateDialogOpen(false);
-        setFormData({ name: '', email: '', password: '', role: 'FIELD_OFFICER' });
+        setFormData({ name: '', email: '', password: '', role: 'COMPLAINANT' });
       } else {
         const error = await response.json();
         toast.error(error.error || 'Failed to create user');
@@ -94,7 +94,7 @@ export default function UsersManagement({ users: initialUsers }: UsersManagement
         toast.success('User updated successfully');
         setEditDialogOpen(false);
         setSelectedUser(null);
-        setFormData({ name: '', email: '', password: '', role: 'FIELD_OFFICER' });
+        setFormData({ name: '', email: '', password: '', role: 'COMPLAINANT' });
       } else {
         const error = await response.json();
         toast.error(error.error || 'Failed to update user');
@@ -143,6 +143,8 @@ export default function UsersManagement({ users: initialUsers }: UsersManagement
         return 'secondary';
       case 'DCP':
         return 'outline';
+      case 'COMPLAINANT':
+        return 'secondary';
       default:
         return 'outline';
     }
@@ -220,6 +222,7 @@ export default function UsersManagement({ users: initialUsers }: UsersManagement
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="COMPLAINANT">Complainant</SelectItem>
                       <SelectItem value="FIELD_OFFICER">Field Officer</SelectItem>
                       <SelectItem value="DCP">DCP</SelectItem>
                       <SelectItem value="ACP">ACP</SelectItem>
@@ -237,7 +240,7 @@ export default function UsersManagement({ users: initialUsers }: UsersManagement
         </Dialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -245,6 +248,16 @@ export default function UsersManagement({ users: initialUsers }: UsersManagement
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{users.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Complainants</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {users.filter(u => u.role === 'COMPLAINANT').length}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -425,6 +438,7 @@ export default function UsersManagement({ users: initialUsers }: UsersManagement
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="COMPLAINANT">Complainant</SelectItem>
                     <SelectItem value="FIELD_OFFICER">Field Officer</SelectItem>
                     <SelectItem value="DCP">DCP</SelectItem>
                     <SelectItem value="ACP">ACP</SelectItem>

@@ -45,7 +45,7 @@ model User {
   password              String?
   passwordResetToken    String?     @unique
   passwordResetTokenExp DateTime?
-  role                  Role        @default(FIELD_OFFICER)
+  role                  Role        @default(COMPLAINANT)
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @default(now()) @updatedAt
   accounts              Account[]
@@ -53,6 +53,7 @@ model User {
   createdComplaints     Complaint[] @relation("CreatedBy")
   updatedComplaints     Complaint[] @relation("UpdatedBy")
   assignedComplaints    Complaint[] @relation("AssignedTo")
+  approvedComplaints    Complaint[] @relation("ApprovedBy")
   createdFIRs           FIR[]       @relation("FIRCreatedBy")
   updatedFIRs           FIR[]       @relation("FIRUpdatedBy")
   createdComments       Comment[]   @relation("CommentCreatedBy")
@@ -60,11 +61,29 @@ model User {
 }
 
 enum Role {
+  COMPLAINANT
   FIELD_OFFICER
   DCP
   ACP
   COMMISSIONER
   SUPER_ADMIN
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NoticeStatus {
+  NOT_REQUIRED
+  NOT_ISSUED
+  ISSUED
+  REPLIED
+  OVERDUE
+  PENDING
+  SENT
+  RESPONDED
 }
 
 model Commissionerate {
@@ -143,6 +162,18 @@ model Complaint {
   fieldVisitDate                        DateTime?
   peStatus                              String?
 
+  // Notice fields
+  firstNoticeNumber                     String?
+  firstNoticeDate                       DateTime?
+  firstNoticeStatus                     NoticeStatus     @default(NOT_ISSUED)
+  secondNoticeNumber                    String?
+  secondNoticeDate                      DateTime?
+  secondNoticeStatus                    NoticeStatus     @default(NOT_ISSUED)
+  noticeApprovalStatus                  ApprovalStatus   @default(PENDING)
+  approvedById                          String?
+  approvedBy                            User?           @relation("ApprovedBy", fields: [approvedById], references: [id])
+  approvalDate                          DateTime?
+
   // Relations
   commissionerateId                     Int?
   commissionerate                       Commissionerate? @relation(fields: [commissionerateId], references: [id])
@@ -209,12 +240,6 @@ enum ComplaintStatus {
   CLOSED
 }
 
-enum NoticeStatus {
-  NOT_REQUIRED
-  PENDING
-  SENT
-  RESPONDED
-}
 
 enum YesNo {
   YES

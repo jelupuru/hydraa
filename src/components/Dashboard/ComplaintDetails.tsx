@@ -12,6 +12,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MapPin, FileText, UserIcon, AlertTriangle, Phone, MessageSquare } from 'lucide-react';
 import FIRManagement from './FIRManagement';
 import CommentManagement from './CommentManagement';
+import EnquiryReport from './EnquiryReport';
+import NoticeOne from './NoticeOne';
+import NoticeTwo from '../NoticeTwo';
+import NoticeApproval from './NoticeApproval';
+import SpeakingOrder from './SpeakingOrder';
 import { generateNotice } from '@/utils/noticeGenerator';
 import { saveAs } from 'file-saver';
 import dynamic from 'next/dynamic';
@@ -47,6 +52,21 @@ type ComplaintWithRelations = {
   peReport: string | null;
   fieldVisitDate: Date | null;
   peStatus: string | null;
+  // Notice tracking fields
+  firstNoticeNumber?: string | null;
+  firstNoticeDate?: Date | null;
+  firstNoticeStatus?: string | null;
+  secondNoticeNumber?: string | null;
+  secondNoticeDate?: Date | null;
+  secondNoticeStatus?: string | null;
+  noticeApprovalStatus?: string | null;
+  approvedById?: string | null;
+  approvalDate?: Date | null;
+  approvedBy?: {
+    id: string;
+    name: string;
+    role: string;
+  } | null;
   createdBy: User;
   updatedBy?: User;
   assignedTo?: User;
@@ -107,6 +127,9 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
   const [reviewComments, setReviewComments] = useState(complaint.investigationOfficerReviewComments || '');
   const [firDetails, setFirDetails] = useState(complaint.firDetails || '');
   const [peReport, setPeReport] = useState(complaint.peReport || '');
+  const [showPEReport, setShowPEReport] = useState(false);
+  const [showNotice, setShowNotice] = useState(false);
+  const [noticeType, setNoticeType] = useState<'first' | 'second'>('first');
   const [loading, setLoading] = useState(false);
 
   const [editorMode, setEditorMode] = useState<'plate'>('plate');
@@ -194,6 +217,7 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
   const canEdit = (field: string) => {
     switch (user.role) {
       case 'FIELD_OFFICER':
+      case 'COMPLAINANT':
         return false; // Field officers can only view
       case 'DCP':
         return ['actionTakenBriefDetails', 'legalIssues', 'anyLegalIssues'].includes(field);
@@ -292,11 +316,13 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="fir">FIR Details</TabsTrigger>
           <TabsTrigger value="comments">Comments</TabsTrigger>
           <TabsTrigger value="pe-report">PE Report</TabsTrigger>
+          <TabsTrigger value="notice">Notice</TabsTrigger>
+          <TabsTrigger value="speaking-order">Speaking Order</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-6">
@@ -415,7 +441,7 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
       </Card>
 
       {/* Investigation Details */}
-      {(user.role !== 'FIELD_OFFICER') && (
+      {(user.role !== 'FIELD_OFFICER' && user.role !== 'COMPLAINANT') && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -531,33 +557,126 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
         </TabsContent>
 
         <TabsContent value="pe-report" className="space-y-6 mt-6">
+          {!showPEReport ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>PE Report / Notice</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium">Notice Content</Label>
+                  <div className="border rounded-md p-2 min-h-[200px]">
+                    <PlatePEEditor ref={plateRef} initialHtml={buildPEReportHtml(complaint)} />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleGenerateNotice}>Generate Notice</Button>
+                  <Button variant="outline" onClick={async () => {
+                    if (!plateRef.current) {
+                      alert('Editor not ready');
+                      return;
+                    }
+                    let html = '';
+                    try {
+                      html = await plateRef.current.getHtml();
+                    } catch (e) {
+                      html = plateRef.current.getMarkdown();
+                    }
+                    handleSaveField('peReport', html);
+                  }}>Save PE Report</Button>
+                  <Button variant="secondary" onClick={() => setShowPEReport(true)}>View PE Report</Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Preliminary Enquiry Report</span>
+                  <Button variant="outline" onClick={() => setShowPEReport(false)}>Back to Editor</Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <EnquiryReport complaint={complaint} />
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="notice" className="space-y-6 mt-6">
+          {!showNotice ? (
+            <>
+              {/* Notice Approval Status */}
+              <NoticeApproval 
+                complaint={complaint} 
+                userRole={user.role}
+                onApprovalUpdate={onUpdate}
+              />
+              
+              {/* Notice Generation */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Generate Official Notice</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Generate an official HYDRAA notice based on this complaint.
+                    {user.role === 'FIELD_OFFICER' && ' Generated notices will require approval from higher authorities.'}
+                  </p>
+                  <div className="flex gap-3">
+                    <Button 
+                      onClick={() => {
+                        setNoticeType('first');
+                        setShowNotice(true);
+                      }}
+                      variant="outline"
+                    >
+                      Generate First Notice
+                    </Button>
+                    <Button 
+                      onClick={() => {
+                        setNoticeType('second');
+                        setShowNotice(true);
+                      }}
+                      variant="outline"
+                    >
+                      Generate Notice 2
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>
+                    {noticeType === 'first' ? 'First Notice' : 'Notice 2'}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => window.print()}>Print</Button>
+                    <Button variant="outline" onClick={() => setShowNotice(false)}>Back</Button>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {noticeType === 'first' ? (
+                  <NoticeOne complaint={complaint} />
+                ) : (
+                  <NoticeTwo complaint={complaint} />
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="speaking-order" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>PE Report / Notice</CardTitle>
+              <CardTitle>Speaking Order - Final Decision</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium">Notice Content</Label>
-                <div className="border rounded-md p-2 min-h-[200px]">
-                  <PlatePEEditor ref={plateRef} initialHtml={buildPEReportHtml(complaint)} />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleGenerateNotice}>Generate Notice</Button>
-                <Button variant="outline" onClick={async () => {
-                  if (!plateRef.current) {
-                    alert('Editor not ready');
-                    return;
-                  }
-                  let html = '';
-                  try {
-                    html = await plateRef.current.getHtml();
-                  } catch (e) {
-                    html = plateRef.current.getMarkdown();
-                  }
-                  handleSaveField('peReport', html);
-                }}>Save PE Report</Button>
-              </div>
+            <CardContent>
+              <SpeakingOrder complaint={complaint} />
             </CardContent>
           </Card>
         </TabsContent>

@@ -59,12 +59,13 @@ const menuItems = [
     title: "Master Data",
     href: "/dashboard/master-data",
     icon: Database,
-    roles: ["SUPER_ADMIN"],
+    roles: ["SUPER_ADMIN", "COMMISSIONER"], // Admin and Commissioner
   },
   {
     title: "Settings",
     href: "/dashboard/settings",
     icon: Settings,
+    roles: ["SUPER_ADMIN", "COMMISSIONER", "DCP", "ACP", "FIELD_OFFICER"], // Not for COMPLAINANT
   },
 ];
 
@@ -73,7 +74,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
 
   const user = session?.user;
-  const userRole = (user as any)?.role || "FIELD_OFFICER";
+  const userRole = (user as any)?.role || "COMPLAINANT";
 
   const filteredMenuItems = menuItems.filter((item) => {
     if (!item.roles) return true;

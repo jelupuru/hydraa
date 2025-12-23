@@ -107,6 +107,13 @@ export async function GET(
         createdBy: true,
         updatedBy: true,
         assignedTo: true,
+        approvedBy: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
         commissionerate: true,
         dcpZone: true,
         municipalZone: true,

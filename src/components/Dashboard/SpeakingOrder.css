@@ -1,0 +1,58 @@
+.so-container {
+  max-width: 900px;
+  margin: auto;
+  padding: 24px;
+  font-family: "Times New Roman", serif;
+  font-size: 14px;
+  color: #000;
+}
+
+.so-title {
+  text-align: center;
+  font-weight: bold;
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.so-office {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.so-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.so-heading {
+  text-align: center;
+  font-size: 16px;
+  font-weight: bold;
+  text-decoration: underline;
+  margin-bottom: 20px;
+}
+
+.so-ref {
+  margin-left: 24px;
+}
+
+.so-divider {
+  text-align: center;
+  margin: 16px 0;
+}
+
+.so-signature {
+  margin-top: 40px;
+  text-align: right;
+}
+
+.so-to {
+  margin-top: 30px;
+}
+
+@media print {
+  .so-container {
+    padding: 0;
+  }
+}

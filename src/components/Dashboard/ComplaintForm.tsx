@@ -342,13 +342,21 @@ export default function ComplaintForm({ user, complaint, onSuccess, onCancel, re
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="natureOfComplaint">Nature of Complaint *</Label>
-              <Input
-                id="natureOfComplaint"
-                value={formData.natureOfComplaint}
-                onChange={(e) => handleInputChange('natureOfComplaint', e.target.value)}
-                placeholder="e.g., Theft, Assault, Harassment"
-                required
-              />
+              <Select value={formData.natureOfComplaint} onValueChange={(value) => handleInputChange('natureOfComplaint', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select nature of complaint" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Lake Encroachment">Lake Encroachment</SelectItem>
+                  <SelectItem value="Dumping in Lake">Dumping in Lake</SelectItem>
+                  <SelectItem value="Illegal Constructions in Lake">Illegal Constructions in Lake</SelectItem>
+                  <SelectItem value="Park Encroachment">Park Encroachment</SelectItem>
+                  <SelectItem value="Road/Footpath Encroachment">Road/Footpath Encroachment</SelectItem>
+                  <SelectItem value="Nala Encroachment">Nala Encroachment</SelectItem>
+                  <SelectItem value="Govt. Land Encroachment">Govt. Land Encroachment</SelectItem>
+                  <SelectItem value="Others">Others</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

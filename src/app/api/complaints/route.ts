@@ -26,7 +26,63 @@ export async function GET(request: NextRequest) {
 
     let complaints;
 
-    if (role === 'FIELD_OFFICER') {
+    // COMPLAINANT users can see all complaints created by other complainants
+    if (role === 'COMPLAINANT') {
+      complaints = await prisma.complaint.findMany({
+        where: { 
+          createdBy: {
+            role: 'COMPLAINANT'
+          }
+        },
+        include: {
+          createdBy: true,
+          updatedBy: true,
+          assignedTo: true,
+          commissionerate: true,
+          dcpZone: true,
+          municipalZone: true,
+          acpDivision: true,
+          attachments: true,
+          firs: {
+            include: {
+              createdBy: true,
+              updatedBy: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+          comments: {
+            where: { isInternal: false }, // Complainants can only see public comments
+            include: {
+              createdBy: true,
+              updatedBy: true,
+              replies: {
+                include: {
+                  createdBy: true,
+                  updatedBy: true,
+                  replies: {
+                    include: {
+                      createdBy: true,
+                      updatedBy: true,
+                      replies: {
+                        include: {
+                          createdBy: true,
+                          updatedBy: true,
+                        },
+                        orderBy: { createdAt: 'asc' },
+                      },
+                    },
+                    orderBy: { createdAt: 'asc' },
+                  },
+                },
+                orderBy: { createdAt: 'asc' },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } else if (role === 'FIELD_OFFICER') {
       complaints = await prisma.complaint.findMany({
         where: { createdById: user.id },
         include: {

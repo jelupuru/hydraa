@@ -25,50 +25,61 @@ interface DashboardOverviewProps {
 }
 
 export default function DashboardOverview({ user }: DashboardOverviewProps) {
+  // Adjust stats for COMPLAINANT role (they only see their created complaints)
+  const isComplainant = user.role === 'COMPLAINANT';
+  
   const stats = [
     {
-      title: 'Created Complaints',
+      title: isComplainant ? 'My Complaints' : 'Created Complaints',
       value: user.createdComplaints.length,
-      description: 'Total complaints you have created',
+      description: isComplainant ? 'Total complaints you have submitted' : 'Total complaints you have created',
       icon: FileText,
       color: 'text-blue-600',
     },
-    {
+    ...(!isComplainant ? [{
       title: 'Assigned Complaints',
       value: user.assignedComplaints.length,
       description: 'Complaints assigned to you',
       icon: Users,
       color: 'text-green-600',
-    },
+    }] : []),
     {
-      title: 'Resolved Complaints',
-      value: user.assignedComplaints.filter((c) => c.finalStatus === 'RESOLVED').length,
-      description: 'Complaints you have resolved',
+      title: isComplainant ? 'Resolved' : 'Resolved Complaints',
+      value: isComplainant ? 
+        user.createdComplaints.filter((c) => c.finalStatus === 'RESOLVED').length :
+        user.assignedComplaints.filter((c) => c.finalStatus === 'RESOLVED').length,
+      description: isComplainant ? 'Your complaints that have been resolved' : 'Complaints you have resolved',
       icon: CheckCircle,
       color: 'text-purple-600',
     },
     {
-      title: 'Pending Reviews',
-      value: user.assignedComplaints.filter((c) =>
-        ['PENDING', 'UNDER_REVIEW_DCP', 'UNDER_REVIEW_ACP', 'UNDER_REVIEW_COMMISSIONER', 'INVESTIGATION_IN_PROGRESS'].includes(c.finalStatus || '')
-      ).length,
-      description: 'Complaints awaiting your review',
+      title: isComplainant ? 'In Progress' : 'Pending Reviews',
+      value: isComplainant ?
+        user.createdComplaints.filter((c) =>
+          ['PENDING', 'UNDER_REVIEW_DCP', 'UNDER_REVIEW_ACP', 'UNDER_REVIEW_COMMISSIONER', 'INVESTIGATION_IN_PROGRESS'].includes(c.finalStatus || '')
+        ).length :
+        user.assignedComplaints.filter((c) =>
+          ['PENDING', 'UNDER_REVIEW_DCP', 'UNDER_REVIEW_ACP', 'UNDER_REVIEW_COMMISSIONER', 'INVESTIGATION_IN_PROGRESS'].includes(c.finalStatus || '')
+        ).length,
+      description: isComplainant ? 'Complaints currently being processed' : 'Complaints awaiting your review',
       icon: Clock,
       color: 'text-orange-600',
     },
   ];
 
-  const recentComplaints = [
-    ...user.createdComplaints.slice(0, 3),
-    ...user.assignedComplaints.slice(0, 3),
-  ].slice(0, 5);
+  const recentComplaints = isComplainant ? 
+    user.createdComplaints.slice(0, 5) :
+    [...user.createdComplaints.slice(0, 3), ...user.assignedComplaints.slice(0, 3)].slice(0, 5);
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Welcome back, {user.name}!</h2>
         <p className="text-muted-foreground">
-          Here's an overview of your complaint management activities.
+          {user.role === 'COMPLAINANT' 
+            ? "Here's an overview of your submitted complaints and their status."
+            : "Here's an overview of your complaint management activities."
+          }
         </p>
       </div>
 

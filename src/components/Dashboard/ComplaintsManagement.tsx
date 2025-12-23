@@ -126,7 +126,8 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
   const canUpdateComplaint = (complaintStatus: ComplaintStatus, userRole: string): boolean => {
     switch (userRole) {
       case 'FIELD_OFFICER':
-        return true; // Allow field officers to update complaints
+      case 'COMPLAINANT':
+        return true; // Allow field officers and complainants to update complaints
       case 'DCP':
         return complaintStatus === ComplaintStatus.PENDING || complaintStatus === ComplaintStatus.UNDER_REVIEW_DCP;
       case 'ACP':
@@ -141,6 +142,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
   const getNextStatus = (userRole: string): ComplaintStatus => {
     switch (userRole) {
       case 'FIELD_OFFICER':
+      case 'COMPLAINANT':
         return ComplaintStatus.UNDER_REVIEW_DCP;
       case 'DCP':
         return ComplaintStatus.UNDER_REVIEW_ACP;
@@ -156,6 +158,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
   const getNextAssigneeRole = (userRole: string): string => {
     switch (userRole) {
       case 'FIELD_OFFICER':
+      case 'COMPLAINANT':
         return 'DCP';
       case 'DCP':
         return 'ACP';
@@ -300,7 +303,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
             Manage and track complaint progress through the system.
           </p>
         </div>
-        {user.role === 'FIELD_OFFICER' && (
+        {(user.role === 'FIELD_OFFICER' || user.role === 'COMPLAINANT') && (
           <Sheet open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <SheetTrigger asChild>
               <Button>
@@ -342,7 +345,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
           {complaints.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No complaints found.</p>
-              {user.role === 'FIELD_OFFICER' && (
+              {(user.role === 'FIELD_OFFICER' || user.role === 'COMPLAINANT') && (
                 <Button
                   variant="outline"
                   className="mt-4"
@@ -461,7 +464,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
                                   <XCircle className="h-4 w-4" />
                                 </Button>
                               </>
-                            ) : user.role === 'FIELD_OFFICER' ? (
+                            ) : (user.role === 'FIELD_OFFICER' || user.role === 'COMPLAINANT') ? (
                               <>
                                 <Button
                                   size="sm"
