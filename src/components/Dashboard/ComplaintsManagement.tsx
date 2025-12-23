@@ -359,6 +359,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Complaint ID</TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Attachments</TableHead>
@@ -369,6 +370,9 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
               <TableBody>
                 {complaints.map((complaint) => (
                   <TableRow key={complaint.id}>
+                    <TableCell className="font-medium text-blue-600">
+                      {complaint.complaintId || complaint.complaintUniqueId || `#${complaint.id}`}
+                    </TableCell>
                     <TableCell className="font-medium">{complaint.natureOfComplaint || 'Untitled Complaint'}</TableCell>
                     <TableCell>
                       <Badge variant={getStatusBadgeVariant(complaint.finalStatus)}>

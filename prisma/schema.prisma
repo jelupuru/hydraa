@@ -50,14 +50,21 @@ model User {
   updatedAt             DateTime    @default(now()) @updatedAt
   accounts              Account[]
   sessions              Session[]
-  createdComplaints     Complaint[] @relation("CreatedBy")
-  updatedComplaints     Complaint[] @relation("UpdatedBy")
-  assignedComplaints    Complaint[] @relation("AssignedTo")
-  approvedComplaints    Complaint[] @relation("ApprovedBy")
-  createdFIRs           FIR[]       @relation("FIRCreatedBy")
-  updatedFIRs           FIR[]       @relation("FIRUpdatedBy")
-  createdComments       Comment[]   @relation("CommentCreatedBy")
-  updatedComments       Comment[]   @relation("CommentUpdatedBy")
+  createdComplaints               Complaint[] @relation("CreatedBy")
+  updatedComplaints               Complaint[] @relation("UpdatedBy")
+  assignedComplaints              Complaint[] @relation("AssignedTo")
+  notice1DcpApprovedComplaints    Complaint[] @relation("Notice1DcpApprovedBy")
+  notice1AcpApprovedComplaints    Complaint[] @relation("Notice1AcpApprovedBy")
+  notice1CommissionerApprovedComplaints Complaint[] @relation("Notice1CommissionerApprovedBy")
+  notice1RejectedComplaints       Complaint[] @relation("Notice1RejectedBy")
+  notice2DcpApprovedComplaints    Complaint[] @relation("Notice2DcpApprovedBy")
+  notice2AcpApprovedComplaints    Complaint[] @relation("Notice2AcpApprovedBy")
+  notice2CommissionerApprovedComplaints Complaint[] @relation("Notice2CommissionerApprovedBy")
+  notice2RejectedComplaints       Complaint[] @relation("Notice2RejectedBy")
+  createdFIRs                     FIR[]       @relation("FIRCreatedBy")
+  updatedFIRs                     FIR[]       @relation("FIRUpdatedBy")
+  createdComments                 Comment[]   @relation("CommentCreatedBy")
+  updatedComments                 Comment[]   @relation("CommentUpdatedBy")
 }
 
 enum Role {
@@ -169,10 +176,38 @@ model Complaint {
   secondNoticeNumber                    String?
   secondNoticeDate                      DateTime?
   secondNoticeStatus                    NoticeStatus     @default(NOT_ISSUED)
-  noticeApprovalStatus                  ApprovalStatus   @default(PENDING)
-  approvedById                          String?
-  approvedBy                            User?           @relation("ApprovedBy", fields: [approvedById], references: [id])
-  approvalDate                          DateTime?
+  
+  // Notice 1 Approval Workflow
+  notice1ApprovalStatus                 ApprovalStatus   @default(PENDING)
+  notice1DcpApprovedById                String?
+  notice1DcpApprovedBy                  User?           @relation("Notice1DcpApprovedBy", fields: [notice1DcpApprovedById], references: [id])
+  notice1DcpApprovalDate                DateTime?
+  notice1AcpApprovedById                String?
+  notice1AcpApprovedBy                  User?           @relation("Notice1AcpApprovedBy", fields: [notice1AcpApprovedById], references: [id])
+  notice1AcpApprovalDate                DateTime?
+  notice1CommissionerApprovedById       String?
+  notice1CommissionerApprovedBy         User?           @relation("Notice1CommissionerApprovedBy", fields: [notice1CommissionerApprovedById], references: [id])
+  notice1CommissionerApprovalDate       DateTime?
+  notice1RejectedById                   String?
+  notice1RejectedBy                     User?           @relation("Notice1RejectedBy", fields: [notice1RejectedById], references: [id])
+  notice1RejectionDate                  DateTime?
+  notice1RejectionReason                String?
+
+  // Notice 2 Approval Workflow
+  notice2ApprovalStatus                 ApprovalStatus   @default(PENDING)
+  notice2DcpApprovedById                String?
+  notice2DcpApprovedBy                  User?           @relation("Notice2DcpApprovedBy", fields: [notice2DcpApprovedById], references: [id])
+  notice2DcpApprovalDate                DateTime?
+  notice2AcpApprovedById                String?
+  notice2AcpApprovedBy                  User?           @relation("Notice2AcpApprovedBy", fields: [notice2AcpApprovedById], references: [id])
+  notice2AcpApprovalDate                DateTime?
+  notice2CommissionerApprovedById       String?
+  notice2CommissionerApprovedBy         User?           @relation("Notice2CommissionerApprovedBy", fields: [notice2CommissionerApprovedById], references: [id])
+  notice2CommissionerApprovalDate       DateTime?
+  notice2RejectedById                   String?
+  notice2RejectedBy                     User?           @relation("Notice2RejectedBy", fields: [notice2RejectedById], references: [id])
+  notice2RejectionDate                  DateTime?
+  notice2RejectionReason                String?
 
   // Relations
   commissionerateId                     Int?

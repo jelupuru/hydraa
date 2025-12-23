@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { Printer, FileText, Calendar, MapPin } from 'lucide-react';
+import ApprovalWorkflow from './ApprovalWorkflow';
 
 interface Complaint {
   id: number;
@@ -16,17 +19,33 @@ interface Complaint {
   createdAt: Date;
   secondNoticeNumber?: string | null;
   secondNoticeDate?: Date | null;
+  // Approval workflow fields for Notice 2
+  notice2ApprovalStatus?: string;
+  notice2DcpApprovalDate?: Date | null;
+  notice2DcpApprovedBy?: any;
+  notice2AcpApprovalDate?: Date | null;
+  notice2AcpApprovedBy?: any;
+  notice2CommissionerApprovalDate?: Date | null;
+  notice2CommissionerApprovedBy?: any;
+  notice2RejectionDate?: Date | null;
+  notice2RejectedBy?: any;
+  notice2RejectionReason?: string | null;
 }
 
 interface NoticeProps {
   complaint: Complaint;
+  user?: {
+    role: string;
+  };
+  onApprovalAction?: (stage: string) => void;
+  onRejectionAction?: (stage: string, reason?: string) => void;
 }
 
-const NoticeTwo: React.FC<NoticeProps> = ({ complaint }) => {
+const NoticeTwo: React.FC<NoticeProps> = ({ complaint, user, onApprovalAction, onRejectionAction }) => {
   const [noticeNumber, setNoticeNumber] = useState(complaint.secondNoticeNumber || '');
   const [noticeDate, setNoticeDate] = useState(
     complaint.secondNoticeDate 
-      ? complaint.secondNoticeDate.toISOString().split('T')[0] 
+      ? new Date(complaint.secondNoticeDate).toISOString().split('T')[0] 
       : new Date().toISOString().split('T')[0]
   );
   const [isEditing, setIsEditing] = useState(!complaint.secondNoticeNumber);
@@ -246,7 +265,37 @@ const NoticeTwo: React.FC<NoticeProps> = ({ complaint }) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+      {/* Approval Workflow Section */}
+      {user && user.role && (onApprovalAction || onRejectionAction) && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Notice 2 - View and Approval Workflow</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ApprovalWorkflow
+                noticeType="notice2"
+                status={(complaint.notice2ApprovalStatus as any) || 'PENDING'}
+                dcpApprovalDate={complaint.notice2DcpApprovalDate}
+                dcpApprovedBy={complaint.notice2DcpApprovedBy}
+                acpApprovalDate={complaint.notice2AcpApprovalDate}
+                acpApprovedBy={complaint.notice2AcpApprovedBy}
+                commissionerApprovalDate={complaint.notice2CommissionerApprovalDate}
+                commissionerApprovedBy={complaint.notice2CommissionerApprovedBy}
+                rejectionDate={complaint.notice2RejectionDate}
+                rejectedBy={complaint.notice2RejectedBy}
+                rejectionReason={complaint.notice2RejectionReason}
+                userRole={user.role}
+                onApprove={onApprovalAction || (() => {})}
+                onReject={onRejectionAction || (() => {})}
+              />
+            </CardContent>
+          </Card>
+          <Separator className="my-6" />
+        </>
+      )}
+
       {/* Control Panel */}
       <div className="mb-6 flex justify-between items-center bg-gray-50 p-4 rounded-lg">
         <div className="flex gap-4">

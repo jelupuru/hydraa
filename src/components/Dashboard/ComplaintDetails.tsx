@@ -16,6 +16,7 @@ import EnquiryReport from './EnquiryReport';
 import NoticeOne from './NoticeOne';
 import NoticeTwo from '../NoticeTwo';
 import NoticeApproval from './NoticeApproval';
+import ApprovalWorkflow from '../ApprovalWorkflow';
 import SpeakingOrder from './SpeakingOrder';
 import { generateNotice } from '@/utils/noticeGenerator';
 import { saveAs } from 'file-saver';
@@ -279,6 +280,59 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
     }
   };
 
+  const handleApprovalAction = async (noticeType: 'notice1' | 'notice2', stage: 'dcp' | 'acp' | 'commissioner') => {
+    try {
+      const response = await fetch(`/api/complaints/${complaint.id}/notices`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'approve',
+          type: noticeType === 'notice1' ? 'first' : 'second',
+          stage
+        }),
+      });
+
+      if (response.ok) {
+        onUpdate(); // Refresh the complaint data
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to approve notice');
+      }
+    } catch (error) {
+      console.error('Error approving notice:', error);
+      alert('Failed to approve notice');
+    }
+  };
+
+  const handleRejectionAction = async (noticeType: 'notice1' | 'notice2', stage: 'dcp' | 'acp' | 'commissioner', reason: string) => {
+    try {
+      const response = await fetch(`/api/complaints/${complaint.id}/notices`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'reject',
+          type: noticeType === 'notice1' ? 'first' : 'second',
+          stage,
+          rejectionReason: reason
+        }),
+      });
+
+      if (response.ok) {
+        onUpdate(); // Refresh the complaint data
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to reject notice');
+      }
+    } catch (error) {
+      console.error('Error rejecting notice:', error);
+      alert('Failed to reject notice');
+    }
+  };
+
   const getStatusBadgeVariant = (status: ComplaintStatus | null) => {
     switch (status) {
       case 'PENDING':
@@ -309,6 +363,32 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
           <p className="text-muted-foreground">
             Created by {complaint.createdBy.name} on {new Date(complaint.createdAt).toLocaleDateString()}
           </p>
+          
+          {/* Notice Status Overview */}
+          <div className="flex gap-4 mt-3">
+            {(complaint.firstNoticeNumber || complaint.firstNoticeDate) && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Notice 1:</span>
+                <Badge variant={
+                  complaint.notice1ApprovalStatus === 'APPROVED' ? 'default' :
+                  complaint.notice1ApprovalStatus === 'REJECTED' ? 'destructive' : 'secondary'
+                } size="sm">
+                  {complaint.notice1ApprovalStatus || 'PENDING'}
+                </Badge>
+              </div>
+            )}
+            {(complaint.secondNoticeNumber || complaint.secondNoticeDate) && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Notice 2:</span>
+                <Badge variant={
+                  complaint.notice2ApprovalStatus === 'APPROVED' ? 'default' :
+                  complaint.notice2ApprovalStatus === 'REJECTED' ? 'destructive' : 'secondary'
+                } size="sm">
+                  {complaint.notice2ApprovalStatus || 'PENDING'}
+                </Badge>
+              </div>
+            )}
+          </div>
         </div>
         <Badge variant={getStatusBadgeVariant(complaint.finalStatus)} className="text-sm">
           {complaint.finalStatus?.replace('_', ' ') || 'Unknown Status'}
@@ -316,8 +396,9 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="approval-status">Approval Status</TabsTrigger>
           <TabsTrigger value="fir">FIR Details</TabsTrigger>
           <TabsTrigger value="comments">Comments</TabsTrigger>
           <TabsTrigger value="pe-report">PE Report</TabsTrigger>
@@ -531,6 +612,156 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
 
         </TabsContent>
 
+        <TabsContent value="approval-status" className="space-y-6 mt-6">
+          {/* Always show Notice 1 Approval Workflow */}
+          <ApprovalWorkflow
+            noticeType="notice1"
+            status={complaint.notice1ApprovalStatus as any || 'PENDING'}
+            dcpApprovalDate={complaint.notice1DcpApprovalDate}
+            dcpApprovedBy={complaint.notice1DcpApprovedBy}
+            acpApprovalDate={complaint.notice1AcpApprovalDate}
+            acpApprovedBy={complaint.notice1AcpApprovedBy}
+            commissionerApprovalDate={complaint.notice1CommissionerApprovalDate}
+            commissionerApprovedBy={complaint.notice1CommissionerApprovedBy}
+            rejectionDate={complaint.notice1RejectionDate}
+            rejectedBy={complaint.notice1RejectedBy}
+            rejectionReason={complaint.notice1RejectionReason}
+            userRole={user.role}
+            onApprove={
+              (complaint.firstNoticeNumber || complaint.firstNoticeDate) 
+                ? (stage) => handleApprovalAction('notice1', stage)
+                : undefined
+            }
+            onReject={
+              (complaint.firstNoticeNumber || complaint.firstNoticeDate)
+                ? (stage, reason) => handleRejectionAction('notice1', stage, reason)
+                : undefined
+            }
+          />
+          
+          {!(complaint.firstNoticeNumber || complaint.firstNoticeDate) && (
+            <Card className="border-orange-200 bg-orange-50">
+              <CardContent className="pt-4">
+                <p className="text-sm text-orange-700 text-center">
+                  📝 Notice 1 has not been generated yet. Generate it from the Notice tab to begin the approval process.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Always show Notice 2 Approval Workflow */}
+          <ApprovalWorkflow
+            noticeType="notice2"
+            status={complaint.notice2ApprovalStatus as any || 'PENDING'}
+            dcpApprovalDate={complaint.notice2DcpApprovalDate}
+            dcpApprovedBy={complaint.notice2DcpApprovedBy}
+            acpApprovalDate={complaint.notice2AcpApprovalDate}
+            acpApprovedBy={complaint.notice2AcpApprovedBy}
+            commissionerApprovalDate={complaint.notice2CommissionerApprovalDate}
+            commissionerApprovedBy={complaint.notice2CommissionerApprovedBy}
+            rejectionDate={complaint.notice2RejectionDate}
+            rejectedBy={complaint.notice2RejectedBy}
+            rejectionReason={complaint.notice2RejectionReason}
+            userRole={user.role}
+            onApprove={
+              (complaint.secondNoticeNumber || complaint.secondNoticeDate) 
+                ? (stage) => handleApprovalAction('notice2', stage)
+                : undefined
+            }
+            onReject={
+              (complaint.secondNoticeNumber || complaint.secondNoticeDate)
+                ? (stage, reason) => handleRejectionAction('notice2', stage, reason)
+                : undefined
+            }
+          />
+          
+          {!(complaint.secondNoticeNumber || complaint.secondNoticeDate) && (
+            <Card className="border-orange-200 bg-orange-50">
+              <CardContent className="pt-4">
+                <p className="text-sm text-orange-700 text-center">
+                  📝 Notice 2 has not been generated yet. Generate it from the Notice tab to begin the approval process.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Overall Approval Status Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Approval Status Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-medium mb-3">Notice 1 Status</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm">Overall Status:</span>
+                      <Badge variant={
+                        complaint.notice1ApprovalStatus === 'APPROVED' ? 'default' :
+                        complaint.notice1ApprovalStatus === 'REJECTED' ? 'destructive' : 'secondary'
+                      }>
+                        {complaint.notice1ApprovalStatus || 'Not Generated'}
+                      </Badge>
+                    </div>
+                    {complaint.notice1DcpApprovalDate && (
+                      <div className="flex justify-between text-sm">
+                        <span>DCP Approved:</span>
+                        <span>{new Date(complaint.notice1DcpApprovalDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {complaint.notice1AcpApprovalDate && (
+                      <div className="flex justify-between text-sm">
+                        <span>ACP Approved:</span>
+                        <span>{new Date(complaint.notice1AcpApprovalDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {complaint.notice1CommissionerApprovalDate && (
+                      <div className="flex justify-between text-sm">
+                        <span>Commissioner Approved:</span>
+                        <span>{new Date(complaint.notice1CommissionerApprovalDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium mb-3">Notice 2 Status</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm">Overall Status:</span>
+                      <Badge variant={
+                        complaint.notice2ApprovalStatus === 'APPROVED' ? 'default' :
+                        complaint.notice2ApprovalStatus === 'REJECTED' ? 'destructive' : 'secondary'
+                      }>
+                        {complaint.notice2ApprovalStatus || 'Not Generated'}
+                      </Badge>
+                    </div>
+                    {complaint.notice2DcpApprovalDate && (
+                      <div className="flex justify-between text-sm">
+                        <span>DCP Approved:</span>
+                        <span>{new Date(complaint.notice2DcpApprovalDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {complaint.notice2AcpApprovalDate && (
+                      <div className="flex justify-between text-sm">
+                        <span>ACP Approved:</span>
+                        <span>{new Date(complaint.notice2AcpApprovalDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {complaint.notice2CommissionerApprovalDate && (
+                      <div className="flex justify-between text-sm">
+                        <span>Commissioner Approved:</span>
+                        <span>{new Date(complaint.notice2CommissionerApprovalDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="fir" className="space-y-6 mt-6">
           <FIRManagement
             complaintId={complaint.id}
@@ -606,43 +837,139 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
         <TabsContent value="notice" className="space-y-6 mt-6">
           {!showNotice ? (
             <>
-              {/* Notice Approval Status */}
-              <NoticeApproval 
-                complaint={complaint} 
-                userRole={user.role}
-                onApprovalUpdate={onUpdate}
-              />
+              {/* Notice 1 Approval Workflow */}
+              {(complaint.firstNoticeNumber || complaint.firstNoticeDate) && (
+                <ApprovalWorkflow
+                  noticeType="notice1"
+                  status={complaint.notice1ApprovalStatus as any || 'PENDING'}
+                  dcpApprovalDate={complaint.notice1DcpApprovalDate}
+                  dcpApprovedBy={complaint.notice1DcpApprovedBy}
+                  acpApprovalDate={complaint.notice1AcpApprovalDate}
+                  acpApprovedBy={complaint.notice1AcpApprovedBy}
+                  commissionerApprovalDate={complaint.notice1CommissionerApprovalDate}
+                  commissionerApprovedBy={complaint.notice1CommissionerApprovedBy}
+                  rejectionDate={complaint.notice1RejectionDate}
+                  rejectedBy={complaint.notice1RejectedBy}
+                  rejectionReason={complaint.notice1RejectionReason}
+                  userRole={user.role}
+                  onApprove={(stage) => handleApprovalAction('notice1', stage)}
+                  onReject={(stage, reason) => handleRejectionAction('notice1', stage, reason)}
+                />
+              )}
+
+              {/* Notice 2 Approval Workflow */}
+              {(complaint.secondNoticeNumber || complaint.secondNoticeDate) && (
+                <ApprovalWorkflow
+                  noticeType="notice2"
+                  status={complaint.notice2ApprovalStatus as any || 'PENDING'}
+                  dcpApprovalDate={complaint.notice2DcpApprovalDate}
+                  dcpApprovedBy={complaint.notice2DcpApprovedBy}
+                  acpApprovalDate={complaint.notice2AcpApprovalDate}
+                  acpApprovedBy={complaint.notice2AcpApprovedBy}
+                  commissionerApprovalDate={complaint.notice2CommissionerApprovalDate}
+                  commissionerApprovedBy={complaint.notice2CommissionerApprovedBy}
+                  rejectionDate={complaint.notice2RejectionDate}
+                  rejectedBy={complaint.notice2RejectedBy}
+                  rejectionReason={complaint.notice2RejectionReason}
+                  userRole={user.role}
+                  onApprove={(stage) => handleApprovalAction('notice2', stage)}
+                  onReject={(stage, reason) => handleRejectionAction('notice2', stage, reason)}
+                />
+              )}
               
               {/* Notice Generation */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Generate Official Notice</CardTitle>
+                  <CardTitle>Generate Official Notices</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
                   <p className="text-sm text-muted-foreground">
-                    Generate an official HYDRAA notice based on this complaint.
-                    {user.role === 'FIELD_OFFICER' && ' Generated notices will require approval from higher authorities.'}
+                    Generate official HYDRAA notices based on this complaint.
+                    {user.role === 'FIELD_OFFICER' && ' Generated notices will require approval from DCP, ACP, and Commissioner.'}
+                    {(['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)) && ' You can view and approve notices once generated.'}
                   </p>
-                  <div className="flex gap-3">
-                    <Button 
-                      onClick={() => {
-                        setNoticeType('first');
-                        setShowNotice(true);
-                      }}
-                      variant="outline"
-                    >
-                      Generate First Notice
-                    </Button>
-                    <Button 
-                      onClick={() => {
-                        setNoticeType('second');
-                        setShowNotice(true);
-                      }}
-                      variant="outline"
-                    >
-                      Generate Notice 2
-                    </Button>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* First Notice Block */}
+                    <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-gray-900">First Notice</h4>
+                        {(complaint.firstNoticeNumber || complaint.firstNoticeDate) && (
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                            <span className="text-xs text-green-600 font-medium">Generated</span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Initial notice for document submission and show cause
+                      </p>
+                      <Button 
+                        onClick={() => {
+                          setNoticeType('first');
+                          setShowNotice(true);
+                        }}
+                        variant={(complaint.firstNoticeNumber || complaint.firstNoticeDate) ? "default" : "outline"}
+                        className="w-full"
+                        size="sm"
+                      >
+                        {(['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)) ? 
+                          'View & Approve First Notice' : 
+                          (complaint.firstNoticeNumber || complaint.firstNoticeDate) ? 
+                            'View First Notice' : 'Generate First Notice'
+                        }
+                      </Button>
+                    </div>
+
+                    {/* Second Notice Block */}
+                    <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-gray-900">Second Notice</h4>
+                        {(complaint.secondNoticeNumber || complaint.secondNoticeDate) && (
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                            <span className="text-xs text-green-600 font-medium">Generated</span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Final notice with compliance deadline and actions
+                      </p>
+                      <Button 
+                        onClick={() => {
+                          setNoticeType('second');
+                          setShowNotice(true);
+                        }}
+                        variant={(complaint.secondNoticeNumber || complaint.secondNoticeDate) ? "default" : "outline"}
+                        className="w-full"
+                        size="sm"
+                      >
+                        {(['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)) ? 
+                          'View & Approve Second Notice' : 
+                          (complaint.secondNoticeNumber || complaint.secondNoticeDate) ? 
+                            'View Second Notice' : 'Generate Second Notice'
+                        }
+                      </Button>
+                    </div>
                   </div>
+
+                  {/* Role-specific information */}
+                  {(['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)) && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center mt-0.5">
+                          <span className="text-white text-xs font-bold">i</span>
+                        </div>
+                        <div>
+                          <h5 className="font-medium text-blue-800 mb-1">Your Role: {user.role}</h5>
+                          <p className="text-sm text-blue-700">
+                            You can view generated notices and provide approval decisions. 
+                            Each notice requires sequential approval from DCP → ACP → Commissioner.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </>
@@ -661,9 +988,19 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
               </CardHeader>
               <CardContent>
                 {noticeType === 'first' ? (
-                  <NoticeOne complaint={complaint} />
+                  <NoticeOne 
+                    complaint={complaint} 
+                    user={user}
+                    onApprovalAction={(stage) => handleApprovalAction('notice1', stage)}
+                    onRejectionAction={(stage, reason) => handleRejectionAction('notice1', stage, reason)}
+                  />
                 ) : (
-                  <NoticeTwo complaint={complaint} />
+                  <NoticeTwo 
+                    complaint={complaint} 
+                    user={user}
+                    onApprovalAction={(stage) => handleApprovalAction('notice2', stage)}
+                    onRejectionAction={(stage, reason) => handleRejectionAction('notice2', stage, reason)}
+                  />
                 )}
               </CardContent>
             </Card>

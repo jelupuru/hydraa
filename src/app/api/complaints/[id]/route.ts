@@ -107,7 +107,56 @@ export async function GET(
         createdBy: true,
         updatedBy: true,
         assignedTo: true,
-        approvedBy: {
+        notice1DcpApprovedBy: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+        notice1AcpApprovedBy: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+        notice1CommissionerApprovedBy: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+        notice1RejectedBy: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+        notice2DcpApprovedBy: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+        notice2AcpApprovedBy: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+        notice2CommissionerApprovedBy: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+        notice2RejectedBy: {
           select: {
             id: true,
             name: true,
