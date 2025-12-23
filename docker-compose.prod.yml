@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hydraa
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hydraa_pass}
+      POSTGRES_DB: hydraa_db
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./backups:/backups
+    ports:
+      - '127.0.0.1:5432:5432'  # Bind to localhost only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hydraa -d hydraa_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DATABASE_URL: "file:./dev.db"
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://hydraa:${POSTGRES_PASSWORD:-hydraa_pass}@db:5432/hydraa_db
+      NODE_ENV: production
+      SECRET: ${SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+      SITE_URL: ${SITE_URL}
+      SITE_NAME: ${SITE_NAME:-Hydraa}
+      AUTHOR_NAME: ${AUTHOR_NAME:-Jayakumar}
+      # Optional services
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      ARCJET_KEY: ${ARCJET_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:3000:3000'  # Bind to localhost only (nginx will proxy)
+    volumes:
+      - app-uploads:/app/public/uploads
+      - ./logs:/app/logs
+    command: sh -c "npx prisma migrate deploy && npm start"
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Optional: Adminer for database management
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8080:8080'  # Bind to localhost only
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      - db
+    networks:
+      - app-network
+
+volumes:
+  db-data:
+    driver: local
+  app-uploads:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

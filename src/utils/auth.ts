@@ -95,6 +95,7 @@ export const authOptions: NextAuthOptions = {
         return {
           ...token,
           id: user.id,
+          role: user.role,
         };
       }
       return token;
@@ -107,10 +108,16 @@ export const authOptions: NextAuthOptions = {
           user: {
             ...session.user,
             id: token?.id,
+            role: token?.role,
           },
         };
       }
       return session;
+    },
+
+    redirect: async ({ url, baseUrl }) => {
+      // Always redirect to dashboard after login
+      return baseUrl + "/dashboard";
     },
   },
 

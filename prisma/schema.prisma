@@ -37,16 +37,239 @@ model Session {
 }
 
 model User {
-  id                    String    @id @default(cuid())
+  id                    String      @id @default(cuid())
   name                  String?
-  email                 String?   @unique
+  email                 String?     @unique
   emailVerified         DateTime?
   image                 String?
   password              String?
-  passwordResetToken    String?   @unique
+  passwordResetToken    String?     @unique
   passwordResetTokenExp DateTime?
+  role                  Role        @default(FIELD_OFFICER)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @default(now()) @updatedAt
   accounts              Account[]
   sessions              Session[]
+  createdComplaints     Complaint[] @relation("CreatedBy")
+  updatedComplaints     Complaint[] @relation("UpdatedBy")
+  assignedComplaints    Complaint[] @relation("AssignedTo")
+  createdFIRs           FIR[]       @relation("FIRCreatedBy")
+  updatedFIRs           FIR[]       @relation("FIRUpdatedBy")
+  createdComments       Comment[]   @relation("CommentCreatedBy")
+  updatedComments       Comment[]   @relation("CommentUpdatedBy")
+}
+
+enum Role {
+  FIELD_OFFICER
+  DCP
+  ACP
+  COMMISSIONER
+  SUPER_ADMIN
+}
+
+model Commissionerate {
+  id          Int         @id @default(autoincrement())
+  name        String
+  code        String?     @unique
+  complaints  Complaint[]
+  dcpZones    DCPZone[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model DCPZone {
+  id                Int             @id @default(autoincrement())
+  name              String
+  code              String?         @unique
+  commissionerateId Int
+  commissionerate   Commissionerate @relation(fields: [commissionerateId], references: [id])
+  complaints        Complaint[]
+  municipalZones    MunicipalZone[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model MunicipalZone {
+  id            Int         @id @default(autoincrement())
+  name          String
+  code          String?     @unique
+  dcpZoneId     Int
+  dcpZone       DCPZone     @relation(fields: [dcpZoneId], references: [id])
+  complaints    Complaint[]
+  acpDivisions  ACPDivision[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model ACPDivision {
+  id               Int            @id @default(autoincrement())
+  name             String
+  code             String?        @unique
+  municipalZoneId  Int
+  municipalZone    MunicipalZone  @relation(fields: [municipalZoneId], references: [id])
+  complaints       Complaint[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model Complaint {
+  id                                    Int             @id @default(autoincrement())
+  complaintId                           String?         @unique
+  complaintUniqueId                     String?         @unique
+  dateOfApplicationReceived             DateTime?
+  complaintCategoryReceivedFrom         String?
+  natureOfComplaint                     String?
+  placeOfComplaint                      String?
+  addressOfComplaintPlace               String?
+  nameOfTheComplainant                  String?
+  phoneOfTheComplainant                 String?
+  addressOfTheComplainant               String?
+  briefDetailsOfTheComplaint            String?
+  detailsOfRespondent                   String?
+  complaintPriority                     ComplaintPriority @default(NORMAL)
+  actionTakenBriefDetails               String?
+  legalIssues                           String?
+  anyLegalIssues                        YesNo            @default(NO)
+  firRegistered                         YesNo            @default(NO)
+  firNumber                             String?
+  firDetails                            String?
+  investigationOfficerReviewComments    String?
+  investigationOfficerReviewDate        DateTime?
+  finalStatus                           ComplaintStatus?
+  sourceOfComplaint                     String?
+  modeOfComplaint                       String?
+  noticeStatus                          NoticeStatus     @default(NOT_REQUIRED)
+  peReport                              String?
+  fieldVisitDate                        DateTime?
+  peStatus                              String?
+
+  // Relations
+  commissionerateId                     Int?
+  commissionerate                       Commissionerate? @relation(fields: [commissionerateId], references: [id])
+  dcpZoneId                             Int?
+  dcpZone                               DCPZone?         @relation(fields: [dcpZoneId], references: [id])
+  municipalZoneId                       Int?
+  municipalZone                         MunicipalZone?   @relation(fields: [municipalZoneId], references: [id])
+  acpDivisionId                         Int?
+  acpDivision                           ACPDivision?     @relation(fields: [acpDivisionId], references: [id])
+
+  createdById                           String
+  createdBy                             User            @relation("CreatedBy", fields: [createdById], references: [id])
+  updatedById                           String?
+  updatedBy                             User?           @relation("UpdatedBy", fields: [updatedById], references: [id])
+  assignedToId                          String?
+  assignedTo                            User?           @relation("AssignedTo", fields: [assignedToId], references: [id])
+
+  createdAt                             DateTime        @default(now())
+  updatedAt                             DateTime        @updatedAt
+
+  attachments                           ComplaintAttachment[]
+  firs                                  FIR[]
+  comments                              Comment[]
+
+  @@map("complaints")
+}
+
+model ComplaintAttachment {
+  id           Int       @id @default(autoincrement())
+  complaintId  Int
+  complaint    Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  filename     String
+  url          String
+  mimeType     String?
+  size         Int?
+  createdAt    DateTime  @default(now())
+}
+
+enum FIRStatus {
+  REGISTERED
+  UNDER_INVESTIGATION
+  CHARGESHEET_FILED
+  COURT_PROCEEDINGS
+  CLOSED
+  WITHDRAWN
+}
+
+enum ComplaintPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum ComplaintStatus {
+  PENDING
+  UNDER_REVIEW_DCP
+  UNDER_REVIEW_ACP
+  UNDER_REVIEW_COMMISSIONER
+  INVESTIGATION_IN_PROGRESS
+  LEGAL_REVIEW
+  RESOLVED
+  REJECTED
+  CLOSED
+}
+
+enum NoticeStatus {
+  NOT_REQUIRED
+  PENDING
+  SENT
+  RESPONDED
+}
+
+enum YesNo {
+  YES
+  NO
+}
+
+model FIR {
+  id                    Int       @id @default(autoincrement())
+  firNumber             String    @unique
+  dateOfRegistration    DateTime
+  policeStation         String
+  investigatingOfficer  String?
+  investigatingOfficerContact String?
+  sectionsApplied       String?   // IPC sections
+  status                FIRStatus @default(REGISTERED)
+  details               String?
+  remarks               String?
+
+  // Relations
+  complaintId           Int
+  complaint             Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  createdById           String
+  createdBy             User      @relation("FIRCreatedBy", fields: [createdById], references: [id])
+  updatedById           String?
+  updatedBy             User?     @relation("FIRUpdatedBy", fields: [updatedById], references: [id])
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("firs")
+}
+
+model Comment {
+  id          Int      @id @default(autoincrement())
+  content     String
+  isInternal  Boolean  @default(false) // For internal notes vs public comments
+
+  // Relations
+  complaintId Int
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  parentId    Int?     // For threaded replies
+  parent      Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     Comment[] @relation("CommentReplies")
+
+  createdById String
+  createdBy   User     @relation("CommentCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?    @relation("CommentUpdatedBy", fields: [updatedById], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("comments")
 }
 
 model VerificationToken {

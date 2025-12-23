@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: hydraa
+      POSTGRES_PASSWORD: hydraa_pass
+      POSTGRES_DB: hydraa_db
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hydraa -d hydraa_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Use sqlite file during image build so Prisma/Next build won't try to reach the DB service.
+        DATABASE_URL: "file:./dev.db"
+    environment:
+      DATABASE_URL: postgresql://hydraa:hydraa_pass@db:5432/hydraa_db
+      NODE_ENV: production
+      SECRET: your-secret-key-here
+      NEXTAUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      SITE_URL: http://localhost:3000
+      SITE_NAME: Hydraa
+      AUTHOR_NAME: Jayakumar
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '3000:3000'
+    command: sh -c "npx prisma migrate deploy && npm start"
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - '8080:8080'
+
+volumes:
+  db-data:

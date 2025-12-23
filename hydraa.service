@@ -1,0 +1,19 @@
+[Unit]
+Description=Hydraa Next.js Application
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+WorkingDirectory=/home/azureuser/hydraa
+ExecStartPre=/usr/local/bin/docker-compose -f docker-compose.prod.yml --env-file .env.production down
+ExecStart=/usr/local/bin/docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
+ExecStop=/usr/local/bin/docker-compose -f docker-compose.prod.yml --env-file .env.production down
+TimeoutStartSec=0
+
+User=azureuser
+Group=azureuser
+
+[Install]
+WantedBy=multi-user.target
