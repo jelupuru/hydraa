@@ -35,8 +35,14 @@ export async function PATCH(
     const updateData = await request.json();
     const { assignedToRole, ...otherUpdateData } = updateData;
 
+    // Check if this is a citizen reply update by Investigation Officer
+    const isCitizenReplyUpdate = (
+      user.role === 'INVESTIGATION_OFFICER' && 
+      (updateData.firstNoticeIssuedDate || updateData.firstNoticeCitizenReply || updateData.firstNoticeCitizenReplyDate)
+    );
+
     // Check if user has permission to update this complaint
-    if (!canUpdateComplaint(user.role, complaint.finalStatus)) {
+    if (!isCitizenReplyUpdate && !canUpdateComplaint(user.role, complaint.finalStatus)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
@@ -46,6 +52,14 @@ export async function PATCH(
       updatedById: user.id,
       updatedAt: new Date(),
     };
+
+    // Convert string dates to Date objects if present
+    if (finalUpdateData.firstNoticeIssuedDate && typeof finalUpdateData.firstNoticeIssuedDate === 'string') {
+      finalUpdateData.firstNoticeIssuedDate = new Date(finalUpdateData.firstNoticeIssuedDate);
+    }
+    if (finalUpdateData.firstNoticeCitizenReplyDate && typeof finalUpdateData.firstNoticeCitizenReplyDate === 'string') {
+      finalUpdateData.firstNoticeCitizenReplyDate = new Date(finalUpdateData.firstNoticeCitizenReplyDate);
+    }
 
     // Handle status transitions and assignments
     if (updateData.finalStatus) {
@@ -85,7 +99,12 @@ export async function PATCH(
     return NextResponse.json(updatedComplaint);
   } catch (error) {
     console.error('Error updating complaint:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Update data received:', updateData);
+    console.error('Final update data:', finalUpdateData);
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }
 

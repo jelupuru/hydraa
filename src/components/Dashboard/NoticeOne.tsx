@@ -1,15 +1,18 @@
+"use client";
+
 import NoticeLayout from "./NoticeLayout";
 import ApprovalWorkflow from '../ApprovalWorkflow';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Printer, Calendar, MapPin, MessageSquare } from 'lucide-react';
+import { Printer, Calendar, MapPin, MessageSquare, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRef, useState, useEffect } from 'react';
 import { serializeHtml } from 'platejs/static';
 import { createPlateEditor } from 'platejs/react';
 import { EditorKit } from '../editor-kit';
+import { toast } from 'sonner';
 
 const PlateNoticeViewer = dynamic(() => import('@/components/PlateNoticeViewer').then((m) => m.PlateNoticeViewer), { ssr: false });
 const PlateNoticeEditor = dynamic(() => import('@/components/PlateNoticeEditor').then((m) => m.PlateNoticeEditor), { ssr: false });
@@ -39,6 +42,10 @@ interface NoticeOneProps {
     notice1RejectedBy?: any;
     notice1RejectionReason?: string | null;
     peNotificationSentToFieldOfficer?: boolean;
+    // Notice 1 citizen response fields
+    firstNoticeIssuedDate?: Date | null;
+    firstNoticeCitizenReply?: string | null;
+    firstNoticeCitizenReplyDate?: Date | null;
   };
   user?: {
     id?: string;
@@ -46,7 +53,7 @@ interface NoticeOneProps {
     email?: string | null;
     role?: string;
   };
-  usersData?: Record<string, { id: string; name: string; email?: string; role?: string }>;
+  usersData?: Record<string, any>;
   onApprovalAction?: (stage: string) => void;
   onRejectionAction?: (stage: string, reason?: string) => void;
 }
@@ -61,6 +68,61 @@ const NoticeOne = ({ complaint, user, usersData, onApprovalAction, onRejectionAc
   const pendingDiscussionsRef = useRef<string>(complaint.firstNoticeDiscussions || '[]');
   const lastSavedContentRef = useRef<string>(complaint.firstNoticeContent || '');
   const lastSavedDiscussionsRef = useRef<string>(complaint.firstNoticeDiscussions || '[]');
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const hadInitialNotice = useRef<boolean>(!!complaint.firstNoticeContent);
+  const creationToastSent = useRef<boolean>(false);
+  const infoToastShown = useRef<boolean>(false);
+
+  const buildDefaultNoticeContent = () => {
+    const paragraphs: string[] = [];
+    paragraphs.push(
+      `Vide reference to the above-cited matter, this Office has received a complaint regarding ${
+        complaint.briefDetailsOfTheComplaint || 'encroachment/violation'
+      }${complaint.placeOfComplaint ? ` at ${complaint.placeOfComplaint}` : ''}.`
+    );
+
+    if (complaint.fieldVisitDate) {
+      paragraphs.push(
+        `As per instructions of the Commissioner, HYDRAA, the subject site was inspected on ${formatDate(
+          complaint.fieldVisitDate
+        )} and prima facie violations were observed at the said location.`
+      );
+    }
+
+    paragraphs.push('In view of the above, you are issued notice to furnish the following documents:');
+    paragraphs.push(
+      '• Copy of approved Layout plan and GPA proceedings.\n• Details of Court cases (if any).\n• Permission obtained for construction/development activities.\n• NOC from concerned authorities (if applicable).\n• Any other relevant documents supporting your case.'
+    );
+    paragraphs.push(
+      'You are also called upon to show cause as to why action should not be initiated against you for the alleged violations.'
+    );
+    paragraphs.push(
+      'You are therefore called upon to submit the above said documents within (7) days from the date of service of this notice, failing which it shall be construed that you have no documents to produce and action will be initiated as deemed fit.'
+    );
+
+    return paragraphs.map((text) => ({ type: 'p', children: [{ text }] }));
+  };
+
+  const initialNoticeContent = complaint.firstNoticeContent || JSON.stringify(buildDefaultNoticeContent());
+
+  const currentUserRole = user?.role ?? '';
+  const hasUserApproved = 
+    (currentUserRole === 'DCP' && complaint.notice1DcpApprovalDate) ||
+    (currentUserRole === 'ACP' && complaint.notice1AcpApprovalDate) ||
+    (currentUserRole === 'COMMISSIONER' && complaint.notice1CommissionerApprovalDate) ||
+    (complaint.notice1DcpApprovalDate && complaint.notice1AcpApprovalDate && complaint.notice1CommissionerApprovalDate);
+  const canEdit = ['INVESTIGATION_OFFICER', 'DCP', 'ACP', 'COMMISSIONER'].includes(currentUserRole) && !hasUserApproved;
+
+  useEffect(() => {
+    if (!canEdit || infoToastShown.current) return;
+    infoToastShown.current = true;
+    if (complaint.firstNoticeContent) {
+      toast.info('Editing Notice 1. Changes auto-save.', { id: 'notice1-edit-info' });
+    } else {
+      toast.info('Create Notice 1: start typing to auto-save.', { id: 'notice1-create-info' });
+    }
+  }, [canEdit, complaint.firstNoticeContent]);
 
   // Fetch review comments
   useEffect(() => {
@@ -128,17 +190,14 @@ const NoticeOne = ({ complaint, user, usersData, onApprovalAction, onRejectionAc
     return `HYDRAA – COMM – Issue of Notice - ${details} at ${location} - Call for documents - Regd.`;
   };
 
-  const currentUserRole = user?.role ?? '';
-
-  const canEdit = ['INVESTIGATION_OFFICER', 'DCP', 'ACP', 'COMMISSIONER'].includes(currentUserRole);
-
   const scheduleAutoSave = (contentJson: string, discussionsJson: string) => {
     if (!canEdit) return;
     if (noticeAutoSaveTimer.current) clearTimeout(noticeAutoSaveTimer.current);
 
     noticeAutoSaveTimer.current = setTimeout(async () => {
       try {
-        await fetch(`/api/complaints/${complaint.id}`, {
+        setSaveState('saving');
+        const res = await fetch(`/api/complaints/${complaint.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -146,11 +205,24 @@ const NoticeOne = ({ complaint, user, usersData, onApprovalAction, onRejectionAc
             firstNoticeDiscussions: discussionsJson,
           }),
         });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({} as any));
+          throw new Error(data.error || `Save failed (${res.status})`);
+        }
         lastSavedContentRef.current = contentJson;
         lastSavedDiscussionsRef.current = discussionsJson;
+        setSaveState('saved');
+        setLastSavedAt(new Date());
         console.log('[NoticeOne] auto-saved Notice 1 content/discussions');
+        toast.success('Notice 1 saved', { id: 'notice1-save' });
+        if (!hadInitialNotice.current && !creationToastSent.current) {
+          creationToastSent.current = true;
+          toast.success('Notice 1 created and saved', { id: 'notice1-created' });
+        }
       } catch (e) {
         console.error('Auto-save failed for Notice 1 template', e);
+        setSaveState('error');
+        toast.error('Failed to save Notice 1');
       }
     }, 1200);
   };
@@ -475,6 +547,8 @@ const NoticeOne = ({ complaint, user, usersData, onApprovalAction, onRejectionAc
         </Button>
       </div>
 
+      {/* Auto-save status is shown near the editor (see below) */}
+
       {/* Approval Workflow Section - Only show if notice is officially created (has notice number) */}
       {showApprovalFlow && (
         <>
@@ -569,10 +643,30 @@ const NoticeOne = ({ complaint, user, usersData, onApprovalAction, onRejectionAc
             <strong>Sir/Madam,</strong>
           </p>
 
-          {complaint.firstNoticeContent ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground print:hidden">
+              {saveState === 'saving' && (
+                <span className="inline-flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Saving...
+                </span>
+              )}
+              {saveState === 'saved' && (
+                <span className="inline-flex items-center gap-1 text-green-700">
+                  <CheckCircle className="h-3 w-3" /> Saved{lastSavedAt ? ` at ${lastSavedAt.toLocaleTimeString()}` : ''}
+                </span>
+              )}
+              {saveState === 'error' && (
+                <span className="inline-flex items-center gap-1 text-red-700">
+                  <AlertTriangle className="h-3 w-3" /> Save failed — will retry on next change
+                </span>
+              )}
+              {saveState === 'idle' && (
+                <span className="inline-flex items-center gap-1">Autosave ready</span>
+              )}
+            </div>
             <PlateNoticeEditor
               readOnly={!canEdit}
-              initialValue={complaint.firstNoticeContent}
+              initialValue={initialNoticeContent}
               initialDiscussions={(() => {
                 try {
                   return complaint.firstNoticeDiscussions ? JSON.parse(complaint.firstNoticeDiscussions) : [];
@@ -605,41 +699,7 @@ const NoticeOne = ({ complaint, user, usersData, onApprovalAction, onRejectionAc
                 }
               }}
             />
-          ) : (
-            <>
-              <p>
-                Vide reference to the above-cited matter, this Office has received a
-                complaint regarding {complaint.briefDetailsOfTheComplaint || "encroachment/violation"} 
-                {complaint.placeOfComplaint && ` at ${complaint.placeOfComplaint}`}.
-              </p>
-
-              {complaint.fieldVisitDate && (
-                <p>
-                  As per instructions of the Commissioner, HYDRAA, the subject site was
-                  inspected on {formatDate(complaint.fieldVisitDate)} and prima facie violations 
-                  were observed at the said location.
-                </p>
-              )}
-
-              <p>
-                In view of the above, you are issued notice to furnish the following
-                documents:
-              </p>
-
-              <ul style={{ marginLeft: '30px', marginBottom: '15px' }}>
-                <li>Copy of approved Layout plan and GPA proceedings.</li>
-                <li>Details of Court cases (if any).</li>
-                <li>Permission obtained for construction/development activities.</li>
-                <li>NOC from concerned authorities (if applicable).</li>
-                <li>Any other relevant documents supporting your case.</li>
-              </ul>
-
-              <p>
-                You are also called upon to show cause as to why action should not be 
-                initiated against you for the alleged violations.
-              </p>
-            </>
-          )}
+          </div>
 
           <p>
             You are therefore called upon to submit the above said documents 

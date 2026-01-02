@@ -208,6 +208,11 @@ model Complaint {
   secondNoticeContent                   String?          @db.Text
   secondNoticeDiscussions               String?          @db.Text
   
+  // Notice 1 Citizen Response
+  firstNoticeIssuedDate                 DateTime?
+  firstNoticeCitizenReply               String?          @db.Text
+  firstNoticeCitizenReplyDate           DateTime?
+  
   // Notice 1 Approval Workflow
   notice1ApprovalStatus                 ApprovalStatus   @default(PENDING)
   notice1DcpApprovedById                String?

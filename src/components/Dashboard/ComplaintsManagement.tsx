@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, Complaint, ComplaintStatus, ComplaintAttachment, FIRStatus } from '@prisma/client';
+import { User, Complaint, ComplaintStatus, ComplaintAttachment, FIRStatus, NoticeStatus } from '@prisma/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,6 +21,24 @@ import ComplaintDetails from './ComplaintDetails';
 interface ComplaintsManagementProps {
   user: User;
 }
+
+// PE workflow is UI/workflow-only, not Prisma-backed
+export type PEStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'REVIEWED'
+  | 'COMPLETED'
+  | 'NOT_STARTED'
+  | 'NOTICE_REQUESTED';
+
+// Notice filter statuses map UI filter options to computed workflow states
+export type NoticeFilterStatus =
+  | 'NOT_GENERATED'
+  | 'NOT_ISSUED'
+  | 'ISSUED'
+  | 'APPROVAL_PENDING'
+  | 'APPROVED'
+  | 'REJECTED';
 
 type ComplaintWithRelations = Complaint & {
   createdBy: User;
@@ -36,10 +55,12 @@ type ComplaintWithRelations = Complaint & {
   // Notice fields
   firstNoticeNumber?: string | null;
   firstNoticeDate?: Date | null;
+  firstNoticeStatus?: NoticeStatus | null;
   firstNoticeContent?: string | null;
   firstNoticeDiscussions?: string | null;
   secondNoticeNumber?: string | null;
   secondNoticeDate?: Date | null;
+  secondNoticeStatus?: NoticeStatus | null;
   secondNoticeContent?: string | null;
   secondNoticeDiscussions?: string | null;
   // Notice 1 approval fields
@@ -78,6 +99,10 @@ type ComplaintWithRelations = Complaint & {
   // Notice sent dates
   firstNoticeSentDate?: Date | null;
   secondNoticeSentDate?: Date | null;
+  // Notice 1 citizen response
+  firstNoticeIssuedDate?: Date | null;
+  firstNoticeCitizenReply?: string | null;
+  firstNoticeCitizenReplyDate?: Date | null;
 };
 
 export default function ComplaintsManagement({ user }: ComplaintsManagementProps) {
@@ -107,14 +132,15 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
   const [filters, setFilters] = useState({
     status: '',
     priority: '',
-    peStatus: '',
-    noticeStatus: '',
+    peStatus: '' as PEStatus | '',
+    noticeStatus: '' as NoticeFilterStatus | '',
     overdue: false,
     dateRange: { start: '', end: '' },
     createdBy: ''
   });
   const [filteredComplaints, setFilteredComplaints] = useState<ComplaintWithRelations[]>([]);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ComplaintWithRelations | null>(null);
 
   // Helper function to check if notice is overdue (3+ days without reply)
   const isNoticeOverdue = (complaint: ComplaintWithRelations): boolean => {
@@ -129,6 +155,45 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
     return daysDiff >= 3;
   };
 
+  // Helper function to check if first notice reply is overdue
+  const isFirstNoticeReplyOverdue = (complaint: ComplaintWithRelations): boolean => {
+    if (!complaint.firstNoticeIssuedDate) return false;
+    if (complaint.firstNoticeCitizenReply) return false; // Reply received
+    
+    const issuedDate = new Date(complaint.firstNoticeIssuedDate);
+    const threeDaysLater = new Date(issuedDate.getTime() + 3 * 24 * 60 * 60 * 1000);
+    return new Date() > threeDaysLater;
+  };
+
+  // Helper function to check if notice 1 is created but not approved
+  const isNotice1PendingApproval = (complaint: ComplaintWithRelations): boolean => {
+    return (
+      (complaint.firstNoticeNumber || complaint.firstNoticeDate) &&
+      !complaint.notice1DcpApprovalDate &&
+      !complaint.notice1AcpApprovalDate &&
+      !complaint.notice1CommissionerApprovalDate
+    );
+  };
+
+  // Helper function to check if notice 1 is approved but not issued
+  const isNotice1ApprovedButNotIssued = (complaint: ComplaintWithRelations): boolean => {
+    return (
+      complaint.notice1DcpApprovalDate &&
+      complaint.notice1AcpApprovalDate &&
+      complaint.notice1CommissionerApprovalDate &&
+      !complaint.firstNoticeIssuedDate
+    );
+  };
+
+  // Helper function to check if notice 1 is issued and awaiting reply
+  const isNotice1AwaitingReply = (complaint: ComplaintWithRelations): boolean => {
+    return (
+      complaint.firstNoticeIssuedDate &&
+      !complaint.firstNoticeCitizenReply &&
+      !isFirstNoticeReplyOverdue(complaint)
+    );
+  };
+
   // Helper function to get days since notice sent
   const getDaysSinceNoticeSent = (complaint: ComplaintWithRelations): number => {
     if (!complaint.firstNoticeSentDate) return 0;
@@ -136,6 +201,30 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
     const sentDate = new Date(complaint.firstNoticeSentDate);
     const now = new Date();
     return Math.floor((now.getTime() - sentDate.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const resolvePEStatus = (c: ComplaintWithRelations): PEStatus => {
+    if (c.peNotificationSentToFieldOfficer) return 'NOTICE_REQUESTED';
+    return (c.peStatus as PEStatus) || 'NOT_STARTED';
+  };
+
+  const resolveNoticeStatus = (c: ComplaintWithRelations): NoticeFilterStatus => {
+    if (!c.firstNoticeNumber && !c.firstNoticeDate) return 'NOT_GENERATED';
+
+    if (c.notice1ApprovalStatus === 'REJECTED' || c.notice1RejectionDate) {
+      return 'REJECTED';
+    }
+
+    if (c.notice1ApprovalStatus === 'APPROVED' || c.notice1CommissionerApprovalDate) {
+      return 'APPROVED';
+    }
+
+    
+    const status = c.firstNoticeStatus as NoticeStatus | null;
+
+    if (status === NoticeStatus.NOT_ISSUED) return 'NOT_ISSUED';
+    if (status === NoticeStatus.ISSUED) return 'ISSUED';
+    return 'APPROVAL_PENDING';
   };
   const [showAddCommentModal, setShowAddCommentModal] = useState(false);
   const [showAddFIRModal, setShowAddFIRModal] = useState(false);
@@ -161,24 +250,12 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
 
     // PE Status filter
     if (filters.peStatus) {
-      filtered = filtered.filter((c) => {
-        const peKey = c.peNotificationSentToFieldOfficer ? 'NOTICE_REQUESTED' : (c.peStatus || 'NOT_STARTED');
-        return peKey === filters.peStatus;
-      });
+      filtered = filtered.filter((c) => resolvePEStatus(c) === filters.peStatus);
     }
 
     // Notice Status filter
     if (filters.noticeStatus) {
-      const noticeKey = (c: ComplaintWithRelations) => {
-        if (!c.firstNoticeNumber && !c.firstNoticeDate) return 'NOT_GENERATED';
-        if (c.notice1RejectionDate || c.notice1ApprovalStatus === 'REJECTED') return 'REJECTED';
-        if (c.notice1CommissionerApprovalDate || c.notice1ApprovalStatus === 'APPROVED') return 'APPROVED';
-        if (c.firstNoticeStatus === 'DRAFT') return 'DRAFT';
-        if (c.firstNoticeStatus === 'ISSUED') return 'ISSUED';
-        return 'APPROVAL_PENDING';
-      };
-
-      filtered = filtered.filter((c) => noticeKey(c) === filters.noticeStatus);
+      filtered = filtered.filter((c) => resolveNoticeStatus(c) === filters.noticeStatus);
     }
 
     // Overdue filter
@@ -342,20 +419,19 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
     return false;
   };
 
-  const handleDeleteComplaint = async (complaint: ComplaintWithRelations) => {
-    if (!canDeleteComplaint(complaint)) return;
-    const confirm = window.confirm('Delete this complaint? This cannot be undone.');
-    if (!confirm) return;
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget || !canDeleteComplaint(deleteTarget)) return;
 
     try {
-      setDeletingId(complaint.id);
-      const res = await fetch(`/api/complaints/${complaint.id}`, { method: 'DELETE' });
+      setDeletingId(deleteTarget.id);
+      const res = await fetch(`/api/complaints/${deleteTarget.id}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({} as any));
         alert(data.error || 'Failed to delete complaint');
         return;
       }
-      setComplaints((prev) => prev.filter((c) => c.id !== complaint.id));
+      setComplaints((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+      setDeleteTarget(null);
     } catch (error) {
       console.error('Error deleting complaint:', error);
       alert('Failed to delete complaint');
@@ -500,6 +576,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
   }
 
   return (
+    <>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -589,7 +666,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
               <label className="text-xs font-medium text-gray-700 mb-1 block">PE Status</label>
               <select 
                 value={filters.peStatus}
-                onChange={(e) => setFilters(prev => ({ ...prev, peStatus: e.target.value }))}
+                onChange={(e) => setFilters(prev => ({ ...prev, peStatus: e.target.value as PEStatus | '' }))}
                 className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md"
               >
                 <option value="">All PE Status</option>
@@ -607,12 +684,12 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
               <label className="text-xs font-medium text-gray-700 mb-1 block">Notice Status</label>
               <select 
                 value={filters.noticeStatus}
-                onChange={(e) => setFilters(prev => ({ ...prev, noticeStatus: e.target.value }))}
+                onChange={(e) => setFilters(prev => ({ ...prev, noticeStatus: e.target.value as NoticeFilterStatus | '' }))}
                 className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md"
               >
                 <option value="">All Notices</option>
                 <option value="NOT_GENERATED">Not Generated</option>
-                <option value="DRAFT">Draft</option>
+                <option value="NOT_ISSUED">Not Issued</option>
                 <option value="ISSUED">Issued</option>
                 <option value="APPROVAL_PENDING">Pending Approval</option>
                 <option value="APPROVED">Approved</option>
@@ -699,7 +776,35 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
               )}
             </div>
           ) : (
-            <Table>
+            <>
+              {/* Status Legend */}
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <h4 className="text-xs font-medium text-gray-700 mb-2">Complaint Status Colors:</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-red-500 rounded"></div>
+                    <span>Overdue Reply</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-purple-500 rounded"></div>
+                    <span>Ready to Issue</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-orange-500 rounded"></div>
+                    <span>Pending Approval</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                    <span>Awaiting Reply</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                    <span>Needs Notice</span>
+                  </div>
+                </div>
+              </div>
+
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Complaint ID</TableHead>
@@ -715,17 +820,34 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
               </TableHeader>
               <TableBody>
                 {filteredComplaints.map((complaint) => {
-                  const isOverdue = isNoticeOverdue(complaint);
+                  const isOverdue = isNoticeOverdue(complaint) || isFirstNoticeReplyOverdue(complaint);
                   const daysSinceSent = getDaysSinceNoticeSent(complaint);
-                  const isPendingNotice1 = complaint.peNotificationSentToFieldOfficer && user.role === 'INVESTIGATION_OFFICER';
+                  const isPendingNotice1 = Boolean(complaint.peNotificationSentToFieldOfficer) && 
+                                          user.role === 'INVESTIGATION_OFFICER' && 
+                                          !complaint.firstNoticeNumber && 
+                                          !complaint.firstNoticeDate;
+                  const isPendingApproval = isNotice1PendingApproval(complaint);
+                  const isApprovedNotIssued = isNotice1ApprovedButNotIssued(complaint);
+                  const isAwaitingReply = isNotice1AwaitingReply(complaint);
+                  
+                  // Priority order: overdue (red) > approved not issued (purple) > pending approval (orange) > awaiting reply (blue) > pending creation (yellow)
+                  let rowClassName = 'cursor-pointer hover:bg-gray-50';
+                  if (isOverdue) {
+                    rowClassName += ' bg-red-50 border-l-4 border-l-red-500';
+                  } else if (isApprovedNotIssued) {
+                    rowClassName += ' bg-purple-50 border-l-4 border-l-purple-500';
+                  } else if (isPendingApproval) {
+                    rowClassName += ' bg-orange-50 border-l-4 border-l-orange-500';
+                  } else if (isAwaitingReply) {
+                    rowClassName += ' bg-blue-50 border-l-4 border-l-blue-500';
+                  } else if (isPendingNotice1) {
+                    rowClassName += ' bg-yellow-50 border-l-4 border-l-yellow-500';
+                  }
                   
                   return (
                     <TableRow 
                       key={complaint.id} 
-                      className={`cursor-pointer hover:bg-gray-50 ${
-                        isOverdue ? 'bg-red-50 border-l-4 border-l-red-500' : 
-                        isPendingNotice1 ? 'bg-yellow-50 border-l-4 border-l-yellow-500' : ''
-                      }`} 
+                      className={rowClassName}
                       onClick={() => handleViewDetails(complaint)}
                     >
                       <TableCell className="font-medium text-blue-600">
@@ -750,24 +872,23 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           {(() => {
-                            const status = complaint.peStatus || 'NOT_STARTED';
-                            // If DCP requested notice creation after review
-                            if (complaint.peNotificationSentToFieldOfficer) {
+                            const peStatus = resolvePEStatus(complaint);
+                            if (peStatus === 'NOTICE_REQUESTED') {
                               return <Badge variant="default" className="text-xs bg-orange-600 hover:bg-orange-700">DCP → Create Notice 1</Badge>;
                             }
-                            if (status === 'COMPLETED') {
+                            if (peStatus === 'COMPLETED') {
                               return <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">✓ PE Completed</Badge>;
                             }
-                            if (status === 'SUBMITTED') {
+                            if (peStatus === 'SUBMITTED') {
                               return <Badge variant="default" className="text-xs bg-blue-600 hover:bg-blue-700">Submitted for Review</Badge>;
                             }
-                            if (status === 'REVIEWED') {
+                            if (peStatus === 'REVIEWED') {
                               return <Badge variant="default" className="text-xs bg-purple-600 hover:bg-purple-700">Under Review</Badge>;
                             }
-                            if (status === 'DRAFT') {
+                            if (peStatus === 'DRAFT') {
                               return <Badge variant="secondary" className="text-xs">Draft</Badge>;
                             }
-                            if (complaint.fieldVisitDate) {
+                            if (peStatus === 'NOT_STARTED' && complaint.fieldVisitDate) {
                               return <Badge variant="outline" className="text-xs bg-yellow-50">Field Visit Done</Badge>;
                             }
                             return <Badge variant="outline" className="text-xs">Not Started</Badge>;
@@ -901,7 +1022,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
                           variant="ghost"
                           size="sm"
                           className="text-red-600 hover:text-red-700"
-                          onClick={() => handleDeleteComplaint(complaint)}
+                          onClick={() => setDeleteTarget(complaint)}
                           disabled={deletingId === complaint.id}
                         >
                           {deletingId === complaint.id ? 'Deleting...' : (
@@ -918,6 +1039,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
                 })}
               </TableBody>
             </Table>
+            </>
           )}
         </CardContent>
       </Card>
@@ -1159,6 +1281,28 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
       )}
 
     </div>
+
+    <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete complaint?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action is permanent. The complaint and its related records will be removed.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deletingId !== null}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={deletingId !== null}
+            className="bg-red-600 hover:bg-red-700"
+            onClick={handleConfirmDelete}
+          >
+            {deletingId && deleteTarget ? 'Deleting...' : 'Delete'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 

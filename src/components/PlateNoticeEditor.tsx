@@ -8,6 +8,7 @@ import { serializeHtml } from 'platejs/static';
 import { discussionPlugin } from '@/components/discussion-kit';
 import { EditorKit } from './editor-kit';
 import { EditorContainer, Editor } from './ui/editor';
+import { toast } from 'sonner';
 
 interface PlateNoticeEditorProps {
   user?: {
@@ -190,9 +191,10 @@ export const PlateNoticeEditor = forwardRef<PlateNoticeEditorRef, PlateNoticeEdi
             debounceId = setTimeout(() => {
               try {
                 onDiscussionsChange(enriched);
-                console.log('[NoticeEditor] discussions auto-save (interval) triggered', enriched);
+                toast.success('Notice discussions saved', { id: 'notice-discussions-save' });
               } catch (err2) {
                 console.error('[NoticeEditor] discussions auto-save callback failed', err2);
+                toast.error('Failed to save discussions');
               }
             }, 800);
           }
@@ -257,9 +259,10 @@ export const PlateNoticeEditor = forwardRef<PlateNoticeEditorRef, PlateNoticeEdi
               discussionsDebounce.current = setTimeout(() => {
                 try {
                   onDiscussionsChange(enriched);
-                  console.log('[NoticeEditor] discussions auto-save (onChange) triggered', enriched);
+                  toast.success('Notice discussions saved', { id: 'notice-discussions-save' });
                 } catch (err2) {
                   console.error('[NoticeEditor] discussions auto-save callback failed', err2);
+                  toast.error('Failed to save discussions');
                 }
               }, 800);
             }

@@ -6,6 +6,7 @@ import { Plate, usePlateEditor } from "platejs/react";
 import { serializeHtml } from "platejs/static";
 import { MarkdownPlugin } from "@platejs/markdown";
 import { discussionPlugin } from "@/components/discussion-kit";
+import { toast } from "sonner";
 
 import { EditorKit } from "@/components/editor-kit";
 import { EditorContainer, Editor } from "@/components/ui/editor";
@@ -178,8 +179,10 @@ const PlatePEEditor = React.forwardRef<PlatePEEditorHandle, PlatePEEditorProps>(
             lastSavedContent.current = contentJson;
             lastSavedDiscussions.current = discussionsJson;
             console.log('[PE Editor] auto-saved content/discussions');
+            toast.success('Preliminary Enquiry saved', { id: 'pe-save' });
           } catch (e) {
             console.error('Error auto-saving PE content/discussions:', e);
+            toast.error('Failed to save PE');
           }
         }, 1200);
       },

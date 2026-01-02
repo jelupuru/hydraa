@@ -68,6 +68,10 @@ type ComplaintWithRelations = {
   // Notice sent dates
   firstNoticeSentDate?: Date | null;
   secondNoticeSentDate?: Date | null;
+  // Notice 1 citizen response
+  firstNoticeIssuedDate?: Date | null;
+  firstNoticeCitizenReply?: string | null;
+  firstNoticeCitizenReplyDate?: Date | null;
   // Notice tracking fields
   firstNoticeNumber?: string | null;
   firstNoticeDate?: Date | null;
@@ -207,6 +211,10 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
   const [showNoticeEditor, setShowNoticeEditor] = useState(false);
   const [noticeType, setNoticeType] = useState<'first' | 'second'>('first');
   const [loading, setLoading] = useState(false);
+  
+  // Citizen reply state
+  const [citizenReply, setCitizenReply] = useState('');
+  const [citizenReplyDate, setCitizenReplyDate] = useState('');
 
   const [editorMode, setEditorMode] = useState<'plate'>('plate');
   const plateRef = useRef<any>(null);
@@ -419,6 +427,97 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
     } catch (error) {
       console.error('Error updating notice sent date:', error);
       alert('An error occurred while updating sent date');
+    }
+  };
+
+  const noticeUsersData: any = useMemo(
+    (): Record<string, { id: string; name: string; email?: string; role?: string }> => {
+      type NoticeUser = { id: string; name: string; email?: string; role?: string };
+
+      const mapUser = (u?: { id?: string | number | null; name?: string | null; email?: unknown; role?: unknown }): NoticeUser | null => {
+        if (!u?.id) return null;
+        const role = typeof u.role === 'string' ? u.role : u.role ? String(u.role) : undefined;
+        const email = typeof u.email === 'string' ? u.email : undefined;
+        const name = typeof u.name === 'string' && u.name.trim().length > 0 ? u.name : 'Unknown';
+
+        return {
+          id: String(u.id),
+          name,
+          email,
+          role,
+        } satisfies NoticeUser;
+      };
+
+      const entries: Record<string, NoticeUser> = {};
+      const created = mapUser((complaint as any).createdBy);
+      if (created) entries[created.id] = created;
+
+      const assigned = mapUser((complaint as any).assignedTo);
+      if (assigned) entries[assigned.id] = assigned;
+
+      const current = mapUser(user as any);
+      if (current) entries[current.id] = current;
+
+      return entries;
+    },
+    [complaint, user]
+  );
+
+  // Handler for updating notice issued date
+  const handleUpdateNoticeIssuedDate = async (issuedDate: Date) => {
+    console.log('Updating notice issued date:', issuedDate);
+    try {
+      const response = await fetch(`/api/complaints/${complaint.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstNoticeIssuedDate: issuedDate.toISOString(),
+        }),
+      });
+
+      console.log('Response status:', response.status);
+      
+      if (response.ok) {
+        onUpdate();
+      } else {
+        const errorData = await response.json();
+        console.error('Update failed:', errorData);
+        alert(`Failed to update notice issued date: ${errorData.error || 'Unknown error'}${errorData.details ? ' - ' + errorData.details : ''}`);
+      }
+    } catch (error) {
+      console.error('Error updating notice issued date:', error);
+      alert('Failed to update notice issued date');
+    }
+  };
+
+  // Handler for saving citizen reply
+  const handleSaveCitizenReply = async () => {
+    try {
+      const response = await fetch(`/api/complaints/${complaint.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstNoticeCitizenReply: citizenReply,
+          firstNoticeCitizenReplyDate: new Date(citizenReplyDate).toISOString(),
+        }),
+      });
+
+      if (response.ok) {
+        setCitizenReply('');
+        setCitizenReplyDate('');
+        onUpdate();
+      } else {
+        const errorData = await response.json();
+        console.error('Save failed:', errorData);
+        alert(`Failed to save citizen reply: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error saving citizen reply:', error);
+      alert('Failed to save citizen reply');
     }
   };
 
@@ -1219,11 +1318,15 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                       <Button 
                         onClick={() => {
                           setNoticeType('first');
-                          if (['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)) {
-                            // DCP/ACP/Commissioner go directly to template view
+                          const hasUserApproved = 
+                            (user.role === 'DCP' && complaint.notice1DcpApprovalDate) ||
+                            (user.role === 'ACP' && complaint.notice1AcpApprovalDate) ||
+                            (user.role === 'COMMISSIONER' && complaint.notice1CommissionerApprovalDate) ||
+                            (complaint.notice1DcpApprovalDate && complaint.notice1AcpApprovalDate && complaint.notice1CommissionerApprovalDate);
+                          
+                          if (['DCP', 'ACP', 'COMMISSIONER'].includes(user.role) || hasUserApproved) {
                             setShowNotice(true);
                           } else {
-                            // Investigation Officer goes to editor
                             setShowNoticeEditor(true);
                           }
                         }}
@@ -1231,10 +1334,17 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                         className="w-full"
                         size="sm"
                       >
-                        {(['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)) ? 
-                          'View & Approve First Notice' : 
-                          (complaint.firstNoticeNumber || complaint.firstNoticeDate) ? 
-                            'View First Notice' : 'Create First Notice'
+                        {(
+                          (user.role === 'DCP' && complaint.notice1DcpApprovalDate) ||
+                          (user.role === 'ACP' && complaint.notice1AcpApprovalDate) ||
+                          (user.role === 'COMMISSIONER' && complaint.notice1CommissionerApprovalDate) ||
+                          (complaint.notice1DcpApprovalDate && complaint.notice1AcpApprovalDate && complaint.notice1CommissionerApprovalDate)
+                        ) ? 
+                          'View' : 
+                          (['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)) ? 
+                            'View & Approve First Notice' : 
+                            (complaint.firstNoticeNumber || complaint.firstNoticeDate) ? 
+                              'View First Notice' : 'Create First Notice'
                         }
                       </Button>
                     </div>
@@ -1341,6 +1451,99 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                                       }
                                     }}
                                   />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Citizen Reply Management - Only for Investigation Officer when Notice 1 is fully approved */}
+                  {user.role === 'INVESTIGATION_OFFICER' && 
+                   complaint.notice1DcpApprovalDate && 
+                   complaint.notice1AcpApprovalDate && 
+                   complaint.notice1CommissionerApprovalDate && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Notice 1 - Citizen Response Management</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Update when the notice is issued to citizens and track their replies.
+                        </p>
+                        
+                        <div className="space-y-4">
+                          {/* Notice Issue Date */}
+                          <div className="space-y-3">
+                            <label className="text-sm font-medium">Date Notice Issued to Citizen</label>
+                            {complaint.firstNoticeIssuedDate ? (
+                              <div className="flex items-center gap-2 p-3 bg-green-50 rounded-md">
+                                <Calendar className="h-4 w-4 text-green-600" />
+                                <div className="text-sm">
+                                  <div className="font-medium text-green-800">Notice Issued</div>
+                                  <div className="text-green-600">
+                                    {new Date(complaint.firstNoticeIssuedDate).toLocaleDateString('en-GB')}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <input 
+                                type="date"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    handleUpdateNoticeIssuedDate(new Date(e.target.value));
+                                  }
+                                }}
+                              />
+                            )}
+                          </div>
+
+                          {/* Citizen Reply */}
+                          {complaint.firstNoticeIssuedDate && (
+                            <div className="space-y-3">
+                              <label className="text-sm font-medium">Citizen Reply</label>
+                              {complaint.firstNoticeCitizenReply ? (
+                                <div className="p-3 bg-blue-50 rounded-md">
+                                  <div className="font-medium text-blue-800 mb-2">Reply Received</div>
+                                  <div className="text-sm text-blue-700 mb-2">
+                                    Date: {complaint.firstNoticeCitizenReplyDate ? 
+                                      new Date(complaint.firstNoticeCitizenReplyDate).toLocaleDateString('en-GB') : 'N/A'}
+                                  </div>
+                                  <div className="text-sm whitespace-pre-wrap">{complaint.firstNoticeCitizenReply}</div>
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  <textarea 
+                                    placeholder="Enter citizen's reply to the notice..."
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                    rows={4}
+                                    onChange={(e) => setCitizenReply(e.target.value)}
+                                    value={citizenReply}
+                                  />
+                                  <div className="flex gap-2">
+                                    <input 
+                                      type="date"
+                                      className="px-3 py-2 border border-gray-300 rounded-md"
+                                      onChange={(e) => setCitizenReplyDate(e.target.value)}
+                                      value={citizenReplyDate}
+                                    />
+                                    <Button 
+                                      onClick={handleSaveCitizenReply}
+                                      disabled={!citizenReply.trim() || !citizenReplyDate}
+                                    >
+                                      Save Reply
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Deadline indicator */}
+                              {complaint.firstNoticeIssuedDate && !complaint.firstNoticeCitizenReply && (
+                                <div className="text-xs text-gray-500">
+                                  Reply deadline: {new Date(new Date(complaint.firstNoticeIssuedDate).getTime() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB')}
                                 </div>
                               )}
                             </div>
@@ -1535,11 +1738,7 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                   <NoticeOne
                     complaint={complaint}
                     user={user}
-                    usersData={{
-                      ...(complaint.createdBy?.id ? { [complaint.createdBy.id]: { id: complaint.createdBy.id, name: complaint.createdBy.name, email: (complaint.createdBy as any).email, role: complaint.createdBy.role } } : {}),
-                      ...(complaint.assignedTo?.id ? { [complaint.assignedTo.id]: { id: complaint.assignedTo.id, name: complaint.assignedTo.name, email: (complaint.assignedTo as any).email, role: complaint.assignedTo.role } } : {}),
-                      ...(user?.id ? { [user.id]: { id: user.id, name: user.name, email: user.email, role: user.role } } : {}),
-                    }}
+                    usersData={noticeUsersData}
                     onApprovalAction={(stage) => handleApprovalAction('notice1', stage as 'dcp' | 'acp' | 'commissioner')}
                     onRejectionAction={(stage, reason) => handleRejectionAction('notice1', stage as 'dcp' | 'acp' | 'commissioner', reason || '')}
                   />
