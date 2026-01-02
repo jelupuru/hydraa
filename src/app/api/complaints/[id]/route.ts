@@ -8,6 +8,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let updateData: any;
+  let finalUpdateData: any;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -32,7 +34,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Complaint not found' }, { status: 404 });
     }
 
-    const updateData = await request.json();
+    updateData = await request.json();
     const { assignedToRole, ...otherUpdateData } = updateData;
 
     // Check if this is a citizen reply update by Investigation Officer
@@ -47,7 +49,7 @@ export async function PATCH(
     }
 
     // Prepare update data
-    const finalUpdateData: any = {
+    finalUpdateData = {
       ...otherUpdateData,
       updatedById: user.id,
       updatedAt: new Date(),

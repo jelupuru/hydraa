@@ -167,7 +167,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
 
   // Helper function to check if notice 1 is created but not approved
   const isNotice1PendingApproval = (complaint: ComplaintWithRelations): boolean => {
-    return (
+    return Boolean(
       (complaint.firstNoticeNumber || complaint.firstNoticeDate) &&
       !complaint.notice1DcpApprovalDate &&
       !complaint.notice1AcpApprovalDate &&
@@ -177,7 +177,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
 
   // Helper function to check if notice 1 is approved but not issued
   const isNotice1ApprovedButNotIssued = (complaint: ComplaintWithRelations): boolean => {
-    return (
+    return Boolean(
       complaint.notice1DcpApprovalDate &&
       complaint.notice1AcpApprovalDate &&
       complaint.notice1CommissionerApprovalDate &&
@@ -187,7 +187,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
 
   // Helper function to check if notice 1 is issued and awaiting reply
   const isNotice1AwaitingReply = (complaint: ComplaintWithRelations): boolean => {
-    return (
+    return Boolean(
       complaint.firstNoticeIssuedDate &&
       !complaint.firstNoticeCitizenReply &&
       !isFirstNoticeReplyOverdue(complaint)
@@ -822,7 +822,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
                 {filteredComplaints.map((complaint) => {
                   const isOverdue = isNoticeOverdue(complaint) || isFirstNoticeReplyOverdue(complaint);
                   const daysSinceSent = getDaysSinceNoticeSent(complaint);
-                  const isPendingNotice1 = Boolean(complaint.peNotificationSentToFieldOfficer) && 
+                  const isPendingNotice1 = (complaint.peNotificationSentToFieldOfficer as boolean) && 
                                           user.role === 'INVESTIGATION_OFFICER' && 
                                           !complaint.firstNoticeNumber && 
                                           !complaint.firstNoticeDate;
