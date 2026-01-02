@@ -662,12 +662,14 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
                 {filteredComplaints.map((complaint) => {
                   const isOverdue = isNoticeOverdue(complaint);
                   const daysSinceSent = getDaysSinceNoticeSent(complaint);
+                  const isPendingNotice1 = complaint.peNotificationSentToFieldOfficer && user.role === 'INVESTIGATION_OFFICER';
                   
                   return (
                     <TableRow 
                       key={complaint.id} 
                       className={`cursor-pointer hover:bg-gray-50 ${
-                        isOverdue ? 'bg-red-50 border-l-4 border-l-red-500' : ''
+                        isOverdue ? 'bg-red-50 border-l-4 border-l-red-500' : 
+                        isPendingNotice1 ? 'bg-yellow-50 border-l-4 border-l-yellow-500' : ''
                       }`} 
                       onClick={() => handleViewDetails(complaint)}
                     >
@@ -677,6 +679,11 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
                           {isOverdue && (
                             <Badge variant="destructive" className="text-xs animate-pulse">
                               OVERDUE {daysSinceSent}d
+                            </Badge>
+                          )}
+                          {isPendingNotice1 && (
+                            <Badge variant="default" className="text-xs bg-yellow-600 hover:bg-yellow-700 animate-pulse">
+                              CREATE NOTICE 1
                             </Badge>
                           )}
                         </div>

@@ -22,6 +22,7 @@ interface PlatePEEditorProps {
   complaintId?: number;
   readOnly?: boolean;
   initialDiscussions?: any[];
+  usersData?: Record<string, { id: string; name: string; email?: string; role?: string }>;
   user?: {
     id: string;
     name: string | null;
@@ -82,7 +83,7 @@ function parseInitialContent(content: string) {
 }
 
 const PlatePEEditor = React.forwardRef<PlatePEEditorHandle, PlatePEEditorProps>(
-  ({ initialHtml, complaintId, readOnly = false, initialDiscussions, user }, ref) => {
+  ({ initialHtml, complaintId, readOnly = false, initialDiscussions, usersData, user }, ref) => {
     const value = React.useMemo(() => {
       const nodes = parseInitialContent(initialHtml || "");
       return normalizeNodeId(nodes as any);
@@ -101,18 +102,47 @@ const PlatePEEditor = React.forwardRef<PlatePEEditorHandle, PlatePEEditorProps>(
     React.useEffect(() => {
       if (user && editor && !discussionsInitialized.current) {
         try {
-          // Set discussion plugin options
-          editor.setOption(discussionPlugin, 'currentUserId', user.id);
-          editor.setOption(discussionPlugin, 'users', {
-            ...editor.getOption(discussionPlugin, 'users'),
-            [user.id]: {
+          // Initialize discussions from props or empty array (only once)
+          const initialDisc = initialDiscussions || [];
+          
+          // Start with provided users data or empty object
+          const usersMap: Record<string, any> = usersData ? { ...usersData } : {};
+          
+          // Ensure current user is in the map
+          if (!usersMap[user.id]) {
+            usersMap[user.id] = {
               id: user.id,
               name: user.name || user.email || 'User',
               avatarUrl: `https://api.dicebear.com/9.x/glass/svg?seed=${user.id}`,
-            },
+            };
+          }
+          
+          // Add all users from existing discussions if not provided in usersData
+          initialDisc.forEach((discussion: any) => {
+            // Add discussion creator if not already present
+            if (discussion.userId && !usersMap[discussion.userId]) {
+              usersMap[discussion.userId] = {
+                id: discussion.userId,
+                name: `User ${discussion.userId.substring(0, 6)}`,
+                avatarUrl: `https://api.dicebear.com/9.x/glass/svg?seed=${discussion.userId}`,
+              };
+            }
+            
+            // Add all commenters
+            discussion.comments?.forEach((comment: any) => {
+              if (comment.userId && !usersMap[comment.userId]) {
+                usersMap[comment.userId] = {
+                  id: comment.userId,
+                  name: `User ${comment.userId.substring(0, 6)}`,
+                  avatarUrl: `https://api.dicebear.com/9.x/glass/svg?seed=${comment.userId}`,
+                };
+              }
+            });
           });
-          // Initialize discussions from props or empty array (only once)
-          const initialDisc = initialDiscussions || [];
+          
+          // Set discussion plugin options
+          editor.setOption(discussionPlugin, 'currentUserId', user.id);
+          editor.setOption(discussionPlugin, 'users', usersMap);
           editor.setOption(discussionPlugin, 'discussions', initialDisc);
           lastSavedDiscussions.current = JSON.stringify(initialDisc);
           discussionsInitialized.current = true;
@@ -120,7 +150,7 @@ const PlatePEEditor = React.forwardRef<PlatePEEditorHandle, PlatePEEditorProps>(
           console.log('Error configuring discussion plugin:', e);
         }
       }
-    }, [user, editor, initialDiscussions]);
+    }, [user, editor, initialDiscussions, usersData]);
 
     // Auto-save discussions when they change
     React.useEffect(() => {

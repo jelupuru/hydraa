@@ -69,6 +69,8 @@ model User {
   createdComments                 Comment[]   @relation("CommentCreatedBy")
   updatedComments                 Comment[]   @relation("CommentUpdatedBy")
   peComments                      PEComment[] @relation("PECommentUser")
+  peReviewComments                PEReviewComment[] @relation("PEReviewCommentUser")
+  notice1ReviewComments           Notice1ReviewComment[] @relation("Notice1ReviewCommentUser")
 }
 
 enum Role {
@@ -197,10 +199,14 @@ model Complaint {
   firstNoticeDate                       DateTime?
   firstNoticeStatus                     NoticeStatus     @default(NOT_ISSUED)
   firstNoticeSentDate                   DateTime?
+  firstNoticeContent                    String?          @db.Text
+  firstNoticeDiscussions                String?          @db.Text
   secondNoticeNumber                    String?
   secondNoticeDate                      DateTime?
   secondNoticeStatus                    NoticeStatus     @default(NOT_ISSUED)
   secondNoticeSentDate                  DateTime?
+  secondNoticeContent                   String?          @db.Text
+  secondNoticeDiscussions               String?          @db.Text
   
   // Notice 1 Approval Workflow
   notice1ApprovalStatus                 ApprovalStatus   @default(PENDING)
@@ -258,6 +264,8 @@ model Complaint {
   firs                                  FIR[]
   comments                              Comment[]
   peComments                            PEComment[]
+  peReviewComments                      PEReviewComment[]
+  notice1ReviewComments                 Notice1ReviewComment[]
 
   @@map("complaints")
 }
@@ -378,6 +386,47 @@ model PEComment {
   @@map("pe_comments")
   @@index([complaintId])
   @@index([commentId])
+}
+
+// PE Review Comments (DCP/ACP/Commissioner workflow comments)
+model PEReviewComment {
+  id          String   @id @default(uuid())
+  comment     String   @db.Text
+  reviewerRole String  // DCP, ACP, COMMISSIONER
+  
+  // Relations
+  complaintId Int
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User     @relation("PEReviewCommentUser", fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("pe_review_comments")
+  @@index([complaintId])
+  @@index([userId])
+}
+
+model Notice1ReviewComment {
+  id          String   @id @default(uuid())
+  comment     String   @db.Text
+  reviewerRole String  // DCP, ACP, COMMISSIONER
+  
+  // Relations
+  complaintId Int
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User     @relation("Notice1ReviewCommentUser", fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("notice1_review_comments")
+  @@index([complaintId])
+  @@index([userId])
 }
 
 model VerificationToken {

@@ -1,5 +1,5 @@
 import "./EnquiryReport.css";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -42,6 +42,49 @@ const EnquiryReport = ({ complaint, user, onDcpComment, onNotifyFieldOfficer }: 
   const [dcpComments, setDcpComments] = useState(complaint.peDcpComments || '');
   const [isCommenting, setIsCommenting] = useState(false);
   const [isNotifying, setIsNotifying] = useState(false);
+  const [reviewComments, setReviewComments] = useState<any[]>([]);
+  const [newReviewComment, setNewReviewComment] = useState('');
+  const [isAddingComment, setIsAddingComment] = useState(false);
+
+  // Check if user can add review comments
+  const canAddComments = user && ['DCP', 'ACP', 'COMMISSIONER'].includes(user.role);
+
+  // Fetch PE review comments
+  useEffect(() => {
+    const fetchReviewComments = async () => {
+      try {
+        const response = await fetch(`/api/complaints/${complaint.id}/pe-review-comments`);
+        if (response.ok) {
+          const data = await response.json();
+          setReviewComments(data);
+        }
+      } catch (error) {
+        console.error('Error fetching review comments:', error);
+      }
+    };
+    fetchReviewComments();
+  }, [complaint.id]);
+
+  const handleAddReviewComment = async () => {
+    if (!newReviewComment.trim()) return;
+    setIsAddingComment(true);
+    try {
+      const response = await fetch(`/api/complaints/${complaint.id}/pe-review-comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment: newReviewComment }),
+      });
+      if (response.ok) {
+        const newComment = await response.json();
+        setReviewComments([...reviewComments, newComment]);
+        setNewReviewComment('');
+      }
+    } catch (error) {
+      console.error('Error adding review comment:', error);
+    } finally {
+      setIsAddingComment(false);
+    }
+  };
 
   const formatDate = (date: Date | string | null) => {
     if (!date) return "Not specified";
@@ -85,6 +128,28 @@ const EnquiryReport = ({ complaint, user, onDcpComment, onNotifyFieldOfficer }: 
 
   return (
     <div className="space-y-6">
+      {/* Investigation Officer Notification Alert */}
+      {isInvestigationOfficer && complaint.peNotificationSentToFieldOfficer && (
+        <Card className="border-yellow-300 bg-yellow-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-yellow-100 rounded-full">
+                <Send className="h-5 w-5 text-yellow-700" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-yellow-900 mb-1">Action Required: Create Notice 1</h3>
+                <p className="text-sm text-yellow-800 mb-2">
+                  The DCP has reviewed the PE report and requests you to proceed with creating Notice 1.
+                </p>
+                <div className="text-xs text-yellow-700">
+                  Notified on {formatDateTime(complaint.peNotificationDate || null)} by {complaint.peNotificationBy?.name}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* DCP Workflow Section */}
       {isDcp && (
         <Card>
@@ -95,28 +160,10 @@ const EnquiryReport = ({ complaint, user, onDcpComment, onNotifyFieldOfficer }: 
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <label className="text-sm font-medium">Add Comments for PE Report</label>
-                <Textarea
-                  value={dcpComments}
-                  onChange={(e) => setDcpComments(e.target.value)}
-                  placeholder="Add your review comments for this PE report..."
-                  rows={4}
-                />
-                <Button 
-                  onClick={handleSaveComments}
-                  disabled={isCommenting || !dcpComments.trim()}
-                  className="w-full"
-                >
-                  {isCommenting ? 'Saving...' : 'Save Comments'}
-                </Button>
-              </div>
-              
-              <div className="space-y-3">
-                <label className="text-sm font-medium">Workflow Actions</label>
-                <div className="space-y-2">
-                  {complaint.peNotificationSentToFieldOfficer ? (
+            <div className="space-y-3">
+              <label className="text-sm font-medium">Workflow Actions</label>
+              <div className="space-y-2">
+                {complaint.peNotificationSentToFieldOfficer ? (
                     <div className="flex items-center gap-2 p-3 bg-green-50 rounded-md">
                       <Send className="h-4 w-4 text-green-600" />
                       <div className="text-sm">
@@ -127,29 +174,83 @@ const EnquiryReport = ({ complaint, user, onDcpComment, onNotifyFieldOfficer }: 
                       </div>
                     </div>
                   ) : (
-                    <Button 
-                      onClick={handleNotifyFieldOfficer}
-                      disabled={isNotifying}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      {isNotifying ? 'Notifying...' : 'Notify Investigation Officer to Create Notice 1'}
-                    </Button>
-                  )}
-                </div>
+                  <Button 
+                    onClick={handleNotifyFieldOfficer}
+                    disabled={isNotifying}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    {isNotifying ? 'Notifying...' : 'Notify Investigation Officer to Create Notice 1'}
+                  </Button>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Existing Comments Display - Visible to Investigation Officers and above */}
-      {canViewComments && complaint.peDcpComments && (
+      {/* PE Review Comments - Multiple comments from DCP/ACP/Commissioner */}
+      {canViewComments && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              PE Review Comments
+              {isInvestigationOfficer && <Badge variant="outline">For Review</Badge>}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Display all review comments */}
+            {reviewComments.length > 0 ? (
+              <div className="space-y-4 mb-4">
+                {reviewComments.map((comment) => (
+                  <div key={comment.id} className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant="outline">{comment.reviewerRole} Review</Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {formatDateTime(comment.createdAt)} by {comment.user.name}
+                      </span>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap">{comment.comment}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground mb-4">No review comments yet</p>
+            )}
+
+            {/* Add new comment form for DCP/ACP/Commissioner */}
+            {canAddComments && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Add Review Comment</label>
+                <Textarea
+                  value={newReviewComment}
+                  onChange={(e) => setNewReviewComment(e.target.value)}
+                  placeholder="Enter your review comments here..."
+                  rows={4}
+                  className="w-full"
+                />
+                <Button 
+                  onClick={handleAddReviewComment} 
+                  disabled={isAddingComment || !newReviewComment.trim()}
+                  className="w-full"
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {isAddingComment ? 'Adding Comment...' : 'Add Review Comment'}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Legacy DCP Comments - Keep for backwards compatibility */}
+      {canViewComments && complaint.peDcpComments && reviewComments.length === 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
-              DCP Review Comments
+              DCP Review Comments (Legacy)
               {isInvestigationOfficer && <Badge variant="outline">For Review</Badge>}
             </CardTitle>
           </CardHeader>

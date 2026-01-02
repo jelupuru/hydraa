@@ -71,20 +71,46 @@ export function PlatePEViewer({ content, complaintId, discussions, user }: Plate
   React.useEffect(() => {
     if (editor && !discussionsInitialized.current) {
       try {
-        // Set discussion plugin options for viewing
+        const discussionsList = discussions || [];
+        
+        // Build users object from current user and all users in discussions
+        const usersMap: Record<string, any> = {};
+        
         if (user) {
+          usersMap[user.id] = {
+            id: user.id,
+            name: user.name || user.email || 'User',
+            avatarUrl: `https://api.dicebear.com/9.x/glass/svg?seed=${user.id}`,
+          };
           editor.setOption(discussionPlugin, 'currentUserId', user.id);
-          editor.setOption(discussionPlugin, 'users', {
-            ...editor.getOption(discussionPlugin, 'users'),
-            [user.id]: {
-              id: user.id,
-              name: user.name || user.email || 'User',
-              avatarUrl: `https://api.dicebear.com/9.x/glass/svg?seed=${user.id}`,
-            },
-          });
         }
-        // Load discussions
-        editor.setOption(discussionPlugin, 'discussions', discussions || []);
+        
+        // Add all users from discussions
+        discussionsList.forEach((discussion: any) => {
+          // Add discussion creator if not already present
+          if (discussion.userId && !usersMap[discussion.userId]) {
+            usersMap[discussion.userId] = {
+              id: discussion.userId,
+              name: `User ${discussion.userId.substring(0, 6)}`,
+              avatarUrl: `https://api.dicebear.com/9.x/glass/svg?seed=${discussion.userId}`,
+            };
+          }
+          
+          // Add all commenters
+          discussion.comments?.forEach((comment: any) => {
+            if (comment.userId && !usersMap[comment.userId]) {
+              usersMap[comment.userId] = {
+                id: comment.userId,
+                name: `User ${comment.userId.substring(0, 6)}`,
+                avatarUrl: `https://api.dicebear.com/9.x/glass/svg?seed=${comment.userId}`,
+              };
+            }
+          });
+        });
+        
+        // Set users and discussions
+        editor.setOption(discussionPlugin, 'users', usersMap);
+        editor.setOption(discussionPlugin, 'discussions', discussionsList);
         discussionsInitialized.current = true;
       } catch (e) {
         console.log('Error configuring discussion plugin in viewer:', e);

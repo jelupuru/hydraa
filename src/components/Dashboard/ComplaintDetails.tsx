@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { User, ComplaintStatus, FIRStatus } from '@prisma/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,10 @@ import SpeakingOrder from './SpeakingOrder';
 import { generateNotice } from '@/utils/noticeGenerator';
 import { saveAs } from 'file-saver';
 import dynamic from 'next/dynamic';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+
+const PlatePEEditor = dynamic(() => import('@/components/PlatePEEditor').then((m) => m.default), { ssr: false });
+const PlateNoticeEditor = dynamic(() => import('@/components/PlateNoticeEditor').then((m) => m.PlateNoticeEditor), { ssr: false });
 
 
 type ComplaintWithRelations = {
@@ -68,9 +72,11 @@ type ComplaintWithRelations = {
   firstNoticeNumber?: string | null;
   firstNoticeDate?: Date | null;
   firstNoticeStatus?: string | null;
+  firstNoticeContent?: string | null;
   secondNoticeNumber?: string | null;
   secondNoticeDate?: Date | null;
   secondNoticeStatus?: string | null;
+  secondNoticeContent?: string | null;
   noticeApprovalStatus?: string | null;
   // Notice 1 approval fields
   notice1ApprovalStatus?: string | null;
@@ -156,6 +162,39 @@ interface ComplaintDetailsProps {
 }
 
 export default function ComplaintDetails({ complaint, user, onUpdate }: ComplaintDetailsProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const availableTabs = useMemo(() => (
+    user.role === 'COMPLAINANT'
+      ? ['overview']
+      : ['overview', 'approval-status', 'fir', 'comments', 'pe-report', 'notice', 'speaking-order']
+  ), [user.role]);
+
+  const normalizeTab = useMemo(
+    () => (value: string | null) => (value && availableTabs.includes(value) ? value : 'overview'),
+    [availableTabs]
+  );
+
+  const [activeTab, setActiveTab] = useState<string>(normalizeTab(searchParams.get('tab')));
+
+  useEffect(() => {
+    const paramTab = normalizeTab(searchParams.get('tab'));
+    if (paramTab !== activeTab) {
+      setActiveTab(paramTab);
+    }
+  }, [activeTab, normalizeTab, searchParams]);
+
+  const handleTabChange = (value: string) => {
+    const nextTab = normalizeTab(value);
+    setActiveTab(nextTab);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', nextTab);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
   const [actionDetails, setActionDetails] = useState(complaint.actionTakenBriefDetails || '');
   const [legalIssues, setLegalIssues] = useState(complaint.legalIssues || '');
   const [reviewComments, setReviewComments] = useState(complaint.investigationOfficerReviewComments || '');
@@ -163,11 +202,13 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
   const [peReport, setPeReport] = useState(complaint.peReport || '');
   const [showPEReport, setShowPEReport] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
+  const [showNoticeEditor, setShowNoticeEditor] = useState(false);
   const [noticeType, setNoticeType] = useState<'first' | 'second'>('first');
   const [loading, setLoading] = useState(false);
 
   const [editorMode, setEditorMode] = useState<'plate'>('plate');
   const plateRef = useRef<any>(null);
+  const noticeEditorRef = useRef<any>(null);
   const PlatePEEditor = dynamic(() => import('@/components/PlatePEEditor').then((m) => m.default), { ssr: false });
 
   // Build a PE Report HTML that mimics a bordered enquiry report layout.
@@ -506,7 +547,7 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
         </Badge>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className={`grid w-full ${user.role === 'COMPLAINANT' ? 'grid-cols-1' : 'grid-cols-7'}`}>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           {user.role !== 'COMPLAINANT' && (
@@ -1093,7 +1134,7 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
         </TabsContent>
 
         <TabsContent value="notice" className="space-y-6 mt-6">
-          {!showNotice ? (
+          {!showNotice && !showNoticeEditor ? (
             <>
               {/* Notice 1 Approval Workflow */}
               {(complaint.firstNoticeNumber || complaint.firstNoticeDate) && (
@@ -1165,7 +1206,13 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                       <Button 
                         onClick={() => {
                           setNoticeType('first');
-                          setShowNotice(true);
+                          if (['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)) {
+                            // DCP/ACP/Commissioner go directly to template view
+                            setShowNotice(true);
+                          } else {
+                            // Investigation Officer goes to editor
+                            setShowNoticeEditor(true);
+                          }
                         }}
                         variant={(complaint.firstNoticeNumber || complaint.firstNoticeDate) ? "default" : "outline"}
                         className="w-full"
@@ -1174,7 +1221,7 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                         {(['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)) ? 
                           'View & Approve First Notice' : 
                           (complaint.firstNoticeNumber || complaint.firstNoticeDate) ? 
-                            'View First Notice' : 'Generate First Notice'
+                            'View First Notice' : 'Create First Notice'
                         }
                       </Button>
                     </div>
@@ -1310,20 +1357,140 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                 </CardContent>
               </Card>
             </>
+          ) : showNoticeEditor ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div>
+                    <span>{noticeType === 'first' ? 'Create/Edit First Notice' : 'Create/Edit Second Notice'}</span>
+                    <p className="text-sm text-muted-foreground font-normal mt-1">
+                      {['DCP', 'ACP', 'COMMISSIONER'].includes(user.role) 
+                        ? 'You can view the notice content and add comments for review'
+                        : 'Select text and use the toolbar to add comments. All roles can view and reply to comments.'
+                      }
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setShowNoticeEditor(false)}>Back</Button>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <PlateNoticeEditor
+                  ref={noticeEditorRef}
+                  user={{
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role
+                  }}
+                  complaintId={complaint.id}
+                  initialValue={noticeType === 'first' ? complaint.firstNoticeContent || '' : complaint.secondNoticeContent || ''}
+                  initialDiscussions={noticeType === 'first' && complaint.firstNoticeDiscussions ? JSON.parse(complaint.firstNoticeDiscussions) : []}
+                  readOnly={['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)}
+                />
+                {!['DCP', 'ACP', 'COMMISSIONER'].includes(user.role) && (
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={async () => {
+                      if (!noticeEditorRef.current) {
+                        alert('Editor not ready');
+                        return;
+                      }
+                      try {
+                        const json = await noticeEditorRef.current.getJson();
+                        const discussions = noticeEditorRef.current.getDiscussions();
+                        const discussionsJson = JSON.stringify(discussions);
+                        
+                        // Save both content and discussions
+                        await handleSaveField(
+                          noticeType === 'first' ? 'firstNoticeContent' : 'secondNoticeContent',
+                          json
+                        );
+                        await handleSaveField(
+                          noticeType === 'first' ? 'firstNoticeDiscussions' : 'secondNoticeDiscussions',
+                          discussionsJson
+                        );
+                        
+                        alert('Notice content and comments saved as draft');
+                        onUpdate(); // Refresh to get updated content
+                      } catch (e) {
+                        console.error('Error saving notice:', e);
+                        alert('Error saving notice content');
+                      }
+                    }}
+                    variant="outline"
+                  >
+                    Save Draft
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      setShowNoticeEditor(false);
+                      setShowNotice(true);
+                    }}
+                    variant="secondary"
+                  >
+                    Preview Template & Print
+                  </Button>
+                  <Button 
+                    onClick={async () => {
+                      if (!noticeEditorRef.current) {
+                        alert('Editor not ready');
+                        return;
+                      }
+                      try {
+                        const json = await noticeEditorRef.current.getJson();
+                        const discussions = noticeEditorRef.current.getDiscussions();
+                        const discussionsJson = JSON.stringify(discussions);
+                        const fieldPrefix = noticeType === 'first' ? 'first' : 'second';
+                        
+                        await Promise.all([
+                          handleSaveField(`${fieldPrefix}NoticeContent`, json),
+                          handleSaveField(`${fieldPrefix}NoticeDiscussions`, discussionsJson),
+                          handleSaveField(`${fieldPrefix}NoticeNumber`, `${complaint.id}/Comm/HYDRAA/2025`),
+                          handleSaveField(`${fieldPrefix}NoticeDate`, new Date().toISOString()),
+                          handleSaveField(`${fieldPrefix}NoticeStatus`, 'ISSUED')
+                        ]);
+                        
+                        alert('Notice created successfully');
+                        onUpdate();
+                      } catch (e) {
+                        console.error('Error creating notice:', e);
+                        alert('Error creating notice');
+                      }
+                    }}
+                  >
+                    Create Notice Officially
+                  </Button>
+                </div>
+                )}
+              </CardContent>
+            </Card>
           ) : (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>
-                    {noticeType === 'first' ? 'First Notice' : 'Notice 2'}
+                    {noticeType === 'first' ? 'First Notice - Preview' : 'Second Notice - Preview'}
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 print:hidden">
+                    {user.role === 'INVESTIGATION_OFFICER' && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => {
+                          setShowNotice(false);
+                          setShowNoticeEditor(true);
+                        }}
+                      >
+                        Back to Editor
+                      </Button>
+                    )}
                     <Button variant="outline" onClick={() => window.print()}>Print</Button>
-                    <Button variant="outline" onClick={() => setShowNotice(false)}>Back</Button>
+                    <Button variant="outline" onClick={() => setShowNotice(false)}>Close</Button>
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="print:p-0">
                 {noticeType === 'first' ? (
                   <NoticeOne
                     complaint={complaint}

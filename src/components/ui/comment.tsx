@@ -442,7 +442,12 @@ export function CommentCreateForm({
   const onAddComment = React.useCallback(async () => {
     if (!commentValue) return;
 
+    // Save the comment value before resetting
+    const savedCommentValue = commentValue;
+
+    // Reset the editor and clear state
     commentEditor.tf.reset();
+    setCommentValue(undefined);
 
     if (discussionId) {
       // Get existing discussion
@@ -454,7 +459,7 @@ export function CommentCreateForm({
           comments: [
             {
               id: nanoid(),
-              contentRich: commentValue,
+              contentRich: savedCommentValue,
               createdAt: new Date(),
               discussionId,
               isEdited: false,
@@ -476,7 +481,7 @@ export function CommentCreateForm({
       // Create reply comment
       const comment: TComment = {
         id: nanoid(),
-        contentRich: commentValue,
+        contentRich: savedCommentValue,
         createdAt: new Date(),
         discussionId,
         isEdited: false,
@@ -516,7 +521,7 @@ export function CommentCreateForm({
       comments: [
         {
           id: nanoid(),
-          contentRich: commentValue,
+          contentRich: savedCommentValue,
           createdAt: new Date(),
           discussionId: _discussionId,
           isEdited: false,
