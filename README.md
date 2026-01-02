@@ -4,7 +4,7 @@ A comprehensive complaint management system built with Next.js, designed for eff
 
 ## Features ✨
 
-- **Role-based Access Control**: Multi-level user management (Field Officer, DCP, ACP, Commissioner, Super Admin)
+- **Role-based Access Control**: Multi-level user management (Investigation Officer, DCP, ACP, Commissioner, Super Admin)
 - **Complaint Management**: Complete complaint lifecycle from registration to resolution
 - **FIR Integration**: Seamless FIR registration and tracking
 - **Document Management**: File attachments with secure upload handling

@@ -61,15 +61,19 @@ model User {
   notice2AcpApprovedComplaints    Complaint[] @relation("Notice2AcpApprovedBy")
   notice2CommissionerApprovedComplaints Complaint[] @relation("Notice2CommissionerApprovedBy")
   notice2RejectedComplaints       Complaint[] @relation("Notice2RejectedBy")
+  // PE Workflow relations
+  peDcpCommentedComplaints        Complaint[] @relation("PEDcpCommentedBy")
+  peNotificationComplaints        Complaint[] @relation("PENotificationBy")
   createdFIRs                     FIR[]       @relation("FIRCreatedBy")
   updatedFIRs                     FIR[]       @relation("FIRUpdatedBy")
   createdComments                 Comment[]   @relation("CommentCreatedBy")
   updatedComments                 Comment[]   @relation("CommentUpdatedBy")
+  peComments                      PEComment[] @relation("PECommentUser")
 }
 
 enum Role {
   COMPLAINANT
-  FIELD_OFFICER
+  INVESTIGATION_OFFICER
   DCP
   ACP
   COMMISSIONER
@@ -91,6 +95,14 @@ enum NoticeStatus {
   PENDING
   SENT
   RESPONDED
+}
+
+enum PEStatus {
+  NOT_STARTED
+  DRAFT
+  SUBMITTED
+  REVIEWED
+  COMPLETED
 }
 
 model Commissionerate {
@@ -166,16 +178,29 @@ model Complaint {
   modeOfComplaint                       String?
   noticeStatus                          NoticeStatus     @default(NOT_REQUIRED)
   peReport                              String?
+  peDiscussions                         String?          @db.Text
   fieldVisitDate                        DateTime?
-  peStatus                              String?
+  peStatus                              PEStatus         @default(NOT_STARTED)
+  
+  // PE Report Workflow
+  peDcpComments                         String?
+  peDcpCommentsDate                     DateTime?
+  peDcpCommentsById                     String?
+  peDcpCommentedBy                      User?            @relation("PEDcpCommentedBy", fields: [peDcpCommentsById], references: [id])
+  peNotificationSentToFieldOfficer      Boolean          @default(false)
+  peNotificationDate                    DateTime?
+  peNotificationById                    String?
+  peNotificationBy                      User?            @relation("PENotificationBy", fields: [peNotificationById], references: [id])
 
   // Notice fields
   firstNoticeNumber                     String?
   firstNoticeDate                       DateTime?
   firstNoticeStatus                     NoticeStatus     @default(NOT_ISSUED)
+  firstNoticeSentDate                   DateTime?
   secondNoticeNumber                    String?
   secondNoticeDate                      DateTime?
   secondNoticeStatus                    NoticeStatus     @default(NOT_ISSUED)
+  secondNoticeSentDate                  DateTime?
   
   // Notice 1 Approval Workflow
   notice1ApprovalStatus                 ApprovalStatus   @default(PENDING)
@@ -232,6 +257,7 @@ model Complaint {
   attachments                           ComplaintAttachment[]
   firs                                  FIR[]
   comments                              Comment[]
+  peComments                            PEComment[]
 
   @@map("complaints")
 }
@@ -330,6 +356,28 @@ model Comment {
   updatedAt   DateTime @updatedAt
 
   @@map("comments")
+}
+
+// PlateJS Editor Comments for PE Reports
+model PEComment {
+  id          String   @id @default(uuid())
+  commentId   String   // PlateJS comment ID
+  content     String   @db.Text
+  resolved    Boolean  @default(false)
+  
+  // Relations
+  complaintId Int
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User     @relation("PECommentUser", fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("pe_comments")
+  @@index([complaintId])
+  @@index([commentId])
 }
 
 model VerificationToken {

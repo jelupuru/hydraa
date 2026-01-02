@@ -55,7 +55,7 @@ export default function ComplaintList({ user }: ComplaintListProps) {
 
   const getNextStatus = (currentRole: string): ComplaintStatus => {
     switch (currentRole) {
-      case 'FIELD_OFFICER':
+      case 'INVESTIGATION_OFFICER':
       case 'COMPLAINANT':
         return ComplaintStatus.UNDER_REVIEW_DCP;
       case 'DCP':
@@ -71,7 +71,7 @@ export default function ComplaintList({ user }: ComplaintListProps) {
 
   const getNextAssigneeRole = (currentRole: string): string | undefined => {
     switch (currentRole) {
-      case 'FIELD_OFFICER':
+      case 'INVESTIGATION_OFFICER':
       case 'COMPLAINANT':
         return 'DCP';
       case 'DCP':
@@ -140,7 +140,7 @@ export default function ComplaintList({ user }: ComplaintListProps) {
                     </button>
                   </>
                 )}
-                {(user.role === 'FIELD_OFFICER' || user.role === 'COMPLAINANT') && complaint.finalStatus === ComplaintStatus.PENDING && (
+                {(user.role === 'INVESTIGATION_OFFICER' || user.role === 'COMPLAINANT') && complaint.finalStatus === ComplaintStatus.PENDING && (
                   <>
                     <button
                       onClick={() => updateStatus(complaint.id.toString(), ComplaintStatus.UNDER_REVIEW_DCP)}

@@ -8,8 +8,10 @@ import path from 'path';
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('GET /api/complaints - Starting request');
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
+      console.log('No session or email found');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -18,22 +20,35 @@ export async function GET(request: NextRequest) {
     });
 
     if (!user) {
+      console.log('User not found for email:', session.user.email);
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    console.log('User found:', user.id, 'Role:', user.role);
+
     const { searchParams } = new URL(request.url);
     const role = searchParams.get('role');
+    
+    console.log('Requested role:', role, 'User actual role:', user.role);
 
     let complaints;
 
-    // COMPLAINANT users can see all complaints created by other complainants
+    // COMPLAINANT users can see all complaints
     if (role === 'COMPLAINANT') {
+      console.log('Fetching complaints for COMPLAINANT role');
+      
+      // First, let's check if there are any complaints at all
+      const totalComplaints = await prisma.complaint.count();
+      console.log('Total complaints in database:', totalComplaints);
+      
+      // Check how many complainant users exist
+      const complainantUsers = await prisma.user.count({
+        where: { role: 'COMPLAINANT' }
+      });
+      console.log('Total complainant users:', complainantUsers);
+      
       complaints = await prisma.complaint.findMany({
-        where: { 
-          createdBy: {
-            role: 'COMPLAINANT'
-          }
-        },
+        // Show all complaints to everyone
         include: {
           createdBy: true,
           updatedBy: true,
@@ -82,9 +97,9 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { createdAt: 'desc' },
       });
-    } else if (role === 'FIELD_OFFICER') {
+    } else if (role === 'INVESTIGATION_OFFICER') {
       complaints = await prisma.complaint.findMany({
-        where: { createdById: user.id },
+        // Show all complaints to Investigation Officers
         include: {
           createdBy: true,
           updatedBy: true,
@@ -102,7 +117,7 @@ export async function GET(request: NextRequest) {
             orderBy: { createdAt: 'desc' },
           },
           comments: {
-            where: { isInternal: false }, // Field officers can only see public comments
+            where: { isInternal: false }, // Investigation officers can only see public comments
             include: {
               createdBy: true,
               updatedBy: true,
@@ -242,6 +257,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    console.log('Complaints found:', complaints?.length || 0);
     return NextResponse.json(complaints);
   } catch (error) {
     console.error('Error fetching complaints:', error);

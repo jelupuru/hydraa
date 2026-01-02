@@ -82,8 +82,15 @@ export const commentPlugin = toTPlatePlugin<CommentConfig>(BaseCommentPlugin, {
         setDraft();
 
         editor.tf.collapse();
+        
+        // Ensure selection exists before accessing focus
+        if (!editor.selection) {
+          console.warn('No selection available for comment');
+          return;
+        }
+        
         setOption('activeId', getDraftCommentKey());
-        setOption('commentingBlock', editor.selection!.focus.path.slice(0, 1));
+        setOption('commentingBlock', editor.selection.focus.path.slice(0, 1));
       },
     })
   )

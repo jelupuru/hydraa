@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, FileText, UserIcon, AlertTriangle, Phone, MessageSquare } from 'lucide-react';
+import { MapPin, FileText, UserIcon, AlertTriangle, Phone, MessageSquare, Calendar } from 'lucide-react';
 import FIRManagement from './FIRManagement';
 import CommentManagement from './CommentManagement';
 import EnquiryReport from './EnquiryReport';
@@ -51,8 +51,19 @@ type ComplaintWithRelations = {
   modeOfComplaint: string | null;
   noticeStatus: string | null;
   peReport: string | null;
+  peDiscussions?: string | null;
   fieldVisitDate: Date | null;
   peStatus: string | null;
+  // PE Workflow fields
+  peDcpComments?: string | null;
+  peDcpCommentsDate?: Date | null;
+  peDcpCommentedBy?: { name: string } | null;
+  peNotificationSentToFieldOfficer?: boolean;
+  peNotificationDate?: Date | null;
+  peNotificationBy?: { name: string } | null;
+  // Notice sent dates
+  firstNoticeSentDate?: Date | null;
+  secondNoticeSentDate?: Date | null;
   // Notice tracking fields
   firstNoticeNumber?: string | null;
   firstNoticeDate?: Date | null;
@@ -61,6 +72,28 @@ type ComplaintWithRelations = {
   secondNoticeDate?: Date | null;
   secondNoticeStatus?: string | null;
   noticeApprovalStatus?: string | null;
+  // Notice 1 approval fields
+  notice1ApprovalStatus?: string | null;
+  notice1DcpApprovalDate?: Date | null;
+  notice1AcpApprovalDate?: Date | null;
+  notice1CommissionerApprovalDate?: Date | null;
+  notice1RejectionDate?: Date | null;
+  notice1RejectionReason?: string | null;
+  notice1CommissionerApprovedBy?: { name: string } | null;
+  notice1AcpApprovedBy?: { name: string } | null;
+  notice1DcpApprovedBy?: { name: string } | null;
+  notice1RejectedBy?: { name: string } | null;
+  // Notice 2 approval fields
+  notice2ApprovalStatus?: string | null;
+  notice2DcpApprovalDate?: Date | null;
+  notice2AcpApprovalDate?: Date | null;
+  notice2CommissionerApprovalDate?: Date | null;
+  notice2RejectionDate?: Date | null;
+  notice2RejectionReason?: string | null;
+  notice2CommissionerApprovedBy?: { name: string } | null;
+  notice2AcpApprovedBy?: { name: string } | null;
+  notice2DcpApprovedBy?: { name: string } | null;
+  notice2RejectedBy?: { name: string } | null;
   approvedById?: string | null;
   approvalDate?: Date | null;
   approvedBy?: {
@@ -217,15 +250,16 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
 
   const canEdit = (field: string) => {
     switch (user.role) {
-      case 'FIELD_OFFICER':
+      case 'INVESTIGATION_OFFICER':
+        return ['peReport', 'fieldVisitDate', 'peStatus'].includes(field);
       case 'COMPLAINANT':
-        return false; // Field officers can only view
+        return false; // Complainants can only view
       case 'DCP':
         return ['actionTakenBriefDetails', 'legalIssues', 'anyLegalIssues'].includes(field);
       case 'ACP':
         return ['actionTakenBriefDetails', 'legalIssues', 'anyLegalIssues', 'firRegistered', 'firNumber', 'firDetails', 'investigationOfficerReviewComments', 'investigationOfficerReviewDate'].includes(field);
       case 'COMMISSIONER':
-        return ['actionTakenBriefDetails', 'legalIssues', 'anyLegalIssues', 'firRegistered', 'firNumber', 'firDetails', 'investigationOfficerReviewComments', 'investigationOfficerReviewDate', 'peReport', 'fieldVisitDate', 'peStatus'].includes(field);
+        return ['actionTakenBriefDetails', 'legalIssues', 'anyLegalIssues', 'firRegistered', 'firNumber', 'firDetails', 'investigationOfficerReviewComments', 'investigationOfficerReviewDate', 'fieldVisitDate', 'peStatus'].includes(field);
       case 'SUPER_ADMIN':
         return true;
       default:
@@ -254,6 +288,83 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
       alert('An error occurred');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // PE Workflow Handlers
+  const handleDcpComment = async (comments: string) => {
+    try {
+      const response = await fetch(`/api/complaints/${complaint.id}/pe-workflow`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          action: 'add_comments',
+          comments 
+        }),
+      });
+
+      if (response.ok) {
+        onUpdate(); // Refresh complaint data
+        alert('Comments saved successfully');
+      } else {
+        alert('Failed to save comments');
+      }
+    } catch (error) {
+      console.error('Error saving DCP comments:', error);
+      alert('An error occurred while saving comments');
+    }
+  };
+
+  const handleNotifyFieldOfficer = async () => {
+    try {
+      const response = await fetch(`/api/complaints/${complaint.id}/pe-workflow`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          action: 'notify_investigation_officer'
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        onUpdate(); // Refresh complaint data
+        alert(data.message || 'Investigation Officer has been notified successfully');
+      } else {
+        alert('Failed to notify investigation officer');
+      }
+    } catch (error) {
+      console.error('Error notifying investigation officer:', error);
+      alert('An error occurred while sending notification');
+    }
+  };
+
+  const handleUpdateNoticeSentDate = async (noticeType: 'first' | 'second', sentDate: Date) => {
+    try {
+      const response = await fetch(`/api/complaints/${complaint.id}/pe-workflow`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          action: 'update_sent_date',
+          noticeType,
+          sentDate: sentDate.toISOString()
+        }),
+      });
+
+      if (response.ok) {
+        onUpdate(); // Refresh complaint data
+        alert('Notice sent date updated successfully');
+      } else {
+        alert('Failed to update notice sent date');
+      }
+    } catch (error) {
+      console.error('Error updating notice sent date:', error);
+      alert('An error occurred while updating sent date');
     }
   };
 
@@ -372,7 +483,7 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                 <Badge variant={
                   complaint.notice1ApprovalStatus === 'APPROVED' ? 'default' :
                   complaint.notice1ApprovalStatus === 'REJECTED' ? 'destructive' : 'secondary'
-                } size="sm">
+                }>
                   {complaint.notice1ApprovalStatus || 'PENDING'}
                 </Badge>
               </div>
@@ -383,7 +494,7 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                 <Badge variant={
                   complaint.notice2ApprovalStatus === 'APPROVED' ? 'default' :
                   complaint.notice2ApprovalStatus === 'REJECTED' ? 'destructive' : 'secondary'
-                } size="sm">
+                }>
                   {complaint.notice2ApprovalStatus || 'PENDING'}
                 </Badge>
               </div>
@@ -396,14 +507,18 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className={`grid w-full ${user.role === 'COMPLAINANT' ? 'grid-cols-1' : 'grid-cols-7'}`}>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="approval-status">Approval Status</TabsTrigger>
-          <TabsTrigger value="fir">FIR Details</TabsTrigger>
-          <TabsTrigger value="comments">Comments</TabsTrigger>
-          <TabsTrigger value="pe-report">PE Report</TabsTrigger>
-          <TabsTrigger value="notice">Notice</TabsTrigger>
-          <TabsTrigger value="speaking-order">Speaking Order</TabsTrigger>
+          {user.role !== 'COMPLAINANT' && (
+            <>
+              <TabsTrigger value="approval-status">Approval Status</TabsTrigger>
+              <TabsTrigger value="fir">FIR Details</TabsTrigger>
+              <TabsTrigger value="comments">Comments</TabsTrigger>
+              <TabsTrigger value="pe-report">PE Report</TabsTrigger>
+              <TabsTrigger value="notice">Notice</TabsTrigger>
+              <TabsTrigger value="speaking-order">Speaking Order</TabsTrigger>
+            </>
+          )}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-6">
@@ -522,7 +637,7 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
       </Card>
 
       {/* Investigation Details */}
-      {(user.role !== 'FIELD_OFFICER' && user.role !== 'COMPLAINANT') && (
+      {(user.role !== 'INVESTIGATION_OFFICER' && user.role !== 'COMPLAINANT') && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -612,20 +727,22 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
 
         </TabsContent>
 
-        <TabsContent value="approval-status" className="space-y-6 mt-6">
+        {user.role !== 'COMPLAINANT' && (
+          <>
+            <TabsContent value="approval-status" className="space-y-6 mt-6">
           {/* Always show Notice 1 Approval Workflow */}
           <ApprovalWorkflow
             noticeType="notice1"
             status={complaint.notice1ApprovalStatus as any || 'PENDING'}
-            dcpApprovalDate={complaint.notice1DcpApprovalDate}
-            dcpApprovedBy={complaint.notice1DcpApprovedBy}
-            acpApprovalDate={complaint.notice1AcpApprovalDate}
-            acpApprovedBy={complaint.notice1AcpApprovedBy}
-            commissionerApprovalDate={complaint.notice1CommissionerApprovalDate}
-            commissionerApprovedBy={complaint.notice1CommissionerApprovedBy}
-            rejectionDate={complaint.notice1RejectionDate}
-            rejectedBy={complaint.notice1RejectedBy}
-            rejectionReason={complaint.notice1RejectionReason}
+            dcpApprovalDate={complaint.notice1DcpApprovalDate || undefined}
+            dcpApprovedBy={complaint.notice1DcpApprovedBy || undefined}
+            acpApprovalDate={complaint.notice1AcpApprovalDate || undefined}
+            acpApprovedBy={complaint.notice1AcpApprovedBy || undefined}
+            commissionerApprovalDate={complaint.notice1CommissionerApprovalDate || undefined}
+            commissionerApprovedBy={complaint.notice1CommissionerApprovedBy || undefined}
+            rejectionDate={complaint.notice1RejectionDate || undefined}
+            rejectedBy={complaint.notice1RejectedBy || undefined}
+            rejectionReason={complaint.notice1RejectionReason || undefined}
             userRole={user.role}
             onApprove={
               (complaint.firstNoticeNumber || complaint.firstNoticeDate) 
@@ -653,15 +770,15 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
           <ApprovalWorkflow
             noticeType="notice2"
             status={complaint.notice2ApprovalStatus as any || 'PENDING'}
-            dcpApprovalDate={complaint.notice2DcpApprovalDate}
-            dcpApprovedBy={complaint.notice2DcpApprovedBy}
-            acpApprovalDate={complaint.notice2AcpApprovalDate}
-            acpApprovedBy={complaint.notice2AcpApprovedBy}
-            commissionerApprovalDate={complaint.notice2CommissionerApprovalDate}
-            commissionerApprovedBy={complaint.notice2CommissionerApprovedBy}
-            rejectionDate={complaint.notice2RejectionDate}
-            rejectedBy={complaint.notice2RejectedBy}
-            rejectionReason={complaint.notice2RejectionReason}
+            dcpApprovalDate={complaint.notice2DcpApprovalDate || undefined}
+            dcpApprovedBy={complaint.notice2DcpApprovedBy || undefined}
+            acpApprovalDate={complaint.notice2AcpApprovalDate || undefined}
+            acpApprovedBy={complaint.notice2AcpApprovedBy || undefined}
+            commissionerApprovalDate={complaint.notice2CommissionerApprovalDate || undefined}
+            commissionerApprovedBy={complaint.notice2CommissionerApprovedBy || undefined}
+            rejectionDate={complaint.notice2RejectionDate || undefined}
+            rejectedBy={complaint.notice2RejectedBy || undefined}
+            rejectionReason={complaint.notice2RejectionReason || undefined}
             userRole={user.role}
             onApprove={
               (complaint.secondNoticeNumber || complaint.secondNoticeDate) 
@@ -762,14 +879,14 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
           </Card>
         </TabsContent>
 
-        <TabsContent value="fir" className="space-y-6 mt-6">
+            <TabsContent value="fir" className="space-y-6 mt-6">
           <FIRManagement
             complaintId={complaint.id}
             firs={(complaint.firs || []).map(fir => ({
               ...fir,
               status: fir.status as FIRStatus
             }))}
-            canCreateFIR={['DCP', 'ACP', 'COMMISSIONER', 'SUPER_ADMIN', 'FIELD_OFFICER'].includes(user.role)}
+            canCreateFIR={['DCP', 'ACP', 'COMMISSIONER', 'SUPER_ADMIN', 'INVESTIGATION_OFFICER'].includes(user.role)}
             onFIRCreated={onUpdate}
             onFIREdited={onUpdate}
             onFIRDeleted={onUpdate}
@@ -788,34 +905,170 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
         </TabsContent>
 
         <TabsContent value="pe-report" className="space-y-6 mt-6">
-          {!showPEReport ? (
+          {!canEdit('peReport') ? (
+            // Read-only view for DCP, ACP, and other non-editing roles
             <Card>
               <CardHeader>
-                <CardTitle>PE Report / Notice</CardTitle>
+                <CardTitle>PE Report (Read Only)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <EnquiryReport 
+                  complaint={complaint} 
+                  user={user}
+                  onDcpComment={handleDcpComment}
+                  onNotifyFieldOfficer={handleNotifyFieldOfficer}
+                />
+              </CardContent>
+            </Card>
+          ) : !showPEReport ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {user.role === 'INVESTIGATION_OFFICER' ? 'Create/Edit PE Report' : 'PE Report / Notice'}
+                </CardTitle>
+                {user.role === 'INVESTIGATION_OFFICER' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={
+                        complaint.peStatus === 'DRAFT' ? 'secondary' : 
+                        complaint.peStatus === 'SUBMITTED' ? 'default' : 
+                        complaint.peStatus === 'REVIEWED' ? 'outline' :
+                        'outline'
+                      }>
+                        {complaint.peStatus === 'NOT_STARTED' ? 'Not Started' : complaint.peStatus || 'Not Started'}
+                      </Badge>
+                      {complaint.peStatus === 'SUBMITTED' && (
+                        <span className="text-sm text-muted-foreground">Awaiting review by DCP</span>
+                      )}
+                    </div>
+                    {(!complaint.peReport || complaint.peStatus === 'NOT_STARTED') && (
+                      <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded">
+                        📝 Create your preliminary enquiry report. Include all findings, observations, and recommendations.
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label className="text-sm font-medium">Notice Content</Label>
+                  <Label className="text-sm font-medium">
+                    {user.role === 'INVESTIGATION_OFFICER' ? 'PE Report Content' : 'Notice Content'}
+                  </Label>
                   <div className="border rounded-md p-2 min-h-[200px]">
-                    <PlatePEEditor ref={plateRef} initialHtml={buildPEReportHtml(complaint)} />
+                    <PlatePEEditor 
+                      ref={plateRef} 
+                      initialHtml={
+                        user.role === 'INVESTIGATION_OFFICER' 
+                          ? (complaint.peReport || '') // Use existing PE report content or empty for new reports
+                          : buildPEReportHtml(complaint) // Pre-filled template for other roles
+                      }
+                      initialDiscussions={
+                        (complaint as any).peDiscussions 
+                          ? JSON.parse((complaint as any).peDiscussions)
+                          : []
+                      }
+                      complaintId={complaint.id}
+                      readOnly={user.role !== 'INVESTIGATION_OFFICER'}
+                      user={user}
+                    />
                   </div>
+                  {user.role === 'INVESTIGATION_OFFICER' && !complaint.peReport && (
+                    <div className="text-sm text-muted-foreground mt-2">
+                      Start writing your PE report. You can save as draft and continue editing later.
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={handleGenerateNotice}>Generate Notice</Button>
-                  <Button variant="outline" onClick={async () => {
-                    if (!plateRef.current) {
-                      alert('Editor not ready');
-                      return;
-                    }
-                    let html = '';
-                    try {
-                      html = await plateRef.current.getHtml();
-                    } catch (e) {
-                      html = plateRef.current.getMarkdown();
-                    }
-                    handleSaveField('peReport', html);
-                  }}>Save PE Report</Button>
-                  <Button variant="secondary" onClick={() => setShowPEReport(true)}>View PE Report</Button>
+                  {user.role === 'INVESTIGATION_OFFICER' ? (
+                    <>
+                      <Button 
+                        variant="outline" 
+                        disabled={complaint.peStatus === 'SUBMITTED'}
+                        onClick={async () => {
+                          if (!plateRef.current) {
+                            alert('Editor not ready');
+                            return;
+                          }
+                          let content = '';
+                          let discussions = [];
+                          try {
+                            content = plateRef.current.getJson();
+                            discussions = plateRef.current.getDiscussions();
+                          } catch (e) {
+                            console.error('Error getting JSON content:', e);
+                            alert('Error saving PE report');
+                            return;
+                          }
+                          
+                          if (!content || content.trim() === '' || content === '[]') {
+                            alert('Please add content to your PE report before saving');
+                            return;
+                          }
+                          
+                          await Promise.all([
+                            handleSaveField('peReport', content),
+                            handleSaveField('peDiscussions', JSON.stringify(discussions)),
+                            handleSaveField('peStatus', 'DRAFT')
+                          ]);
+                          alert('PE Report saved as draft');
+                        }}
+                      >
+                        {complaint.peStatus === 'SUBMITTED' ? 'Submitted' : 'Save as Draft'}
+                      </Button>
+                      <Button 
+                        disabled={complaint.peStatus === 'SUBMITTED'}
+                        onClick={async () => {
+                          if (!plateRef.current) {
+                            alert('Editor not ready');
+                            return;
+                          }
+                          let content = '';
+                          let discussions = [];
+                          try {
+                            content = plateRef.current.getJson();
+                            discussions = plateRef.current.getDiscussions();
+                          } catch (e) {
+                            console.error('Error getting JSON content:', e);
+                            alert('Error submitting PE report');
+                            return;
+                          }
+                          
+                          if (!content || content.trim() === '' || content === '[]') {
+                            alert('Please add content to your PE report before submitting');
+                            return;
+                          }
+                          
+                          await Promise.all([
+                            handleSaveField('peReport', content),
+                            handleSaveField('peDiscussions', JSON.stringify(discussions)),
+                            handleSaveField('peStatus', 'SUBMITTED')
+                          ]);
+                          alert('PE Report submitted for review');
+                        }}
+                      >
+                        {complaint.peStatus === 'SUBMITTED' ? 'Already Submitted' : 'Submit PE Report'}
+                      </Button>
+                      <Button variant="secondary" onClick={() => setShowPEReport(true)}>View PE Report</Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button onClick={handleGenerateNotice}>Generate Notice</Button>
+                      <Button variant="outline" onClick={async () => {
+                        if (!plateRef.current) {
+                          alert('Editor not ready');
+                          return;
+                        }
+                        let html = '';
+                        try {
+                          html = await plateRef.current.getHtml();
+                        } catch (e) {
+                          html = plateRef.current.getMarkdown();
+                        }
+                        handleSaveField('peReport', html);
+                      }}>Save PE Report</Button>
+                      <Button variant="secondary" onClick={() => setShowPEReport(true)}>View PE Report</Button>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -828,7 +1081,12 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <EnquiryReport complaint={complaint} />
+                <EnquiryReport 
+                  complaint={complaint} 
+                  user={user}
+                  onDcpComment={handleDcpComment}
+                  onNotifyFieldOfficer={handleNotifyFieldOfficer}
+                />
               </CardContent>
             </Card>
           )}
@@ -842,15 +1100,15 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                 <ApprovalWorkflow
                   noticeType="notice1"
                   status={complaint.notice1ApprovalStatus as any || 'PENDING'}
-                  dcpApprovalDate={complaint.notice1DcpApprovalDate}
-                  dcpApprovedBy={complaint.notice1DcpApprovedBy}
-                  acpApprovalDate={complaint.notice1AcpApprovalDate}
-                  acpApprovedBy={complaint.notice1AcpApprovedBy}
-                  commissionerApprovalDate={complaint.notice1CommissionerApprovalDate}
-                  commissionerApprovedBy={complaint.notice1CommissionerApprovedBy}
-                  rejectionDate={complaint.notice1RejectionDate}
-                  rejectedBy={complaint.notice1RejectedBy}
-                  rejectionReason={complaint.notice1RejectionReason}
+                  dcpApprovalDate={complaint.notice1DcpApprovalDate || undefined}
+                  dcpApprovedBy={complaint.notice1DcpApprovedBy || undefined}
+                  acpApprovalDate={complaint.notice1AcpApprovalDate || undefined}
+                  acpApprovedBy={complaint.notice1AcpApprovedBy || undefined}
+                  commissionerApprovalDate={complaint.notice1CommissionerApprovalDate || undefined}
+                  commissionerApprovedBy={complaint.notice1CommissionerApprovedBy || undefined}
+                  rejectionDate={complaint.notice1RejectionDate || undefined}
+                  rejectedBy={complaint.notice1RejectedBy || undefined}
+                  rejectionReason={complaint.notice1RejectionReason || undefined}
                   userRole={user.role}
                   onApprove={(stage) => handleApprovalAction('notice1', stage)}
                   onReject={(stage, reason) => handleRejectionAction('notice1', stage, reason)}
@@ -862,15 +1120,15 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                 <ApprovalWorkflow
                   noticeType="notice2"
                   status={complaint.notice2ApprovalStatus as any || 'PENDING'}
-                  dcpApprovalDate={complaint.notice2DcpApprovalDate}
-                  dcpApprovedBy={complaint.notice2DcpApprovedBy}
-                  acpApprovalDate={complaint.notice2AcpApprovalDate}
-                  acpApprovedBy={complaint.notice2AcpApprovedBy}
-                  commissionerApprovalDate={complaint.notice2CommissionerApprovalDate}
-                  commissionerApprovedBy={complaint.notice2CommissionerApprovedBy}
-                  rejectionDate={complaint.notice2RejectionDate}
-                  rejectedBy={complaint.notice2RejectedBy}
-                  rejectionReason={complaint.notice2RejectionReason}
+                  dcpApprovalDate={complaint.notice2DcpApprovalDate || undefined}
+                  dcpApprovedBy={complaint.notice2DcpApprovedBy || undefined}
+                  acpApprovalDate={complaint.notice2AcpApprovalDate || undefined}
+                  acpApprovedBy={complaint.notice2AcpApprovedBy || undefined}
+                  commissionerApprovalDate={complaint.notice2CommissionerApprovalDate || undefined}
+                  commissionerApprovedBy={complaint.notice2CommissionerApprovedBy || undefined}
+                  rejectionDate={complaint.notice2RejectionDate || undefined}
+                  rejectedBy={complaint.notice2RejectedBy || undefined}
+                  rejectionReason={complaint.notice2RejectionReason || undefined}
                   userRole={user.role}
                   onApprove={(stage) => handleApprovalAction('notice2', stage)}
                   onReject={(stage, reason) => handleRejectionAction('notice2', stage, reason)}
@@ -885,7 +1143,7 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                 <CardContent className="space-y-6">
                   <p className="text-sm text-muted-foreground">
                     Generate official HYDRAA notices based on this complaint.
-                    {user.role === 'FIELD_OFFICER' && ' Generated notices will require approval from DCP, ACP, and Commissioner.'}
+                    {user.role === 'INVESTIGATION_OFFICER' && ' Generated notices will require approval from DCP, ACP, and Commissioner.'}
                     {(['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)) && ' You can view and approve notices once generated.'}
                   </p>
                   
@@ -953,6 +1211,85 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                     </div>
                   </div>
 
+                  {/* Notice Sent Date Tracking - For Investigation Officers */}
+                  {user.role === 'INVESTIGATION_OFFICER' && (complaint.firstNoticeNumber || complaint.secondNoticeNumber) && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Calendar className="h-5 w-5" />
+                          Notice Delivery Tracking
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Update when notices are sent to citizens. The system will track reply deadlines automatically.
+                        </p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* First Notice Sent Date */}
+                          {complaint.firstNoticeNumber && (
+                            <div className="space-y-3">
+                              <label className="text-sm font-medium">First Notice Sent Date</label>
+                              {complaint.firstNoticeSentDate ? (
+                                <div className="flex items-center gap-2 p-3 bg-green-50 rounded-md">
+                                  <Calendar className="h-4 w-4 text-green-600" />
+                                  <div className="text-sm">
+                                    <div className="font-medium text-green-800">Notice Sent</div>
+                                    <div className="text-green-600">
+                                      {new Date(complaint.firstNoticeSentDate).toLocaleDateString('en-GB')}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <input 
+                                    type="date"
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+                                    onChange={(e) => {
+                                      if (e.target.value) {
+                                        handleUpdateNoticeSentDate('first', new Date(e.target.value));
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Second Notice Sent Date */}
+                          {complaint.secondNoticeNumber && (
+                            <div className="space-y-3">
+                              <label className="text-sm font-medium">Second Notice Sent Date</label>
+                              {complaint.secondNoticeSentDate ? (
+                                <div className="flex items-center gap-2 p-3 bg-green-50 rounded-md">
+                                  <Calendar className="h-4 w-4 text-green-600" />
+                                  <div className="text-sm">
+                                    <div className="font-medium text-green-800">Notice Sent</div>
+                                    <div className="text-green-600">
+                                      {new Date(complaint.secondNoticeSentDate).toLocaleDateString('en-GB')}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <input 
+                                    type="date"
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+                                    onChange={(e) => {
+                                      if (e.target.value) {
+                                        handleUpdateNoticeSentDate('second', new Date(e.target.value));
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   {/* Role-specific information */}
                   {(['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)) && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -988,18 +1325,18 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
               </CardHeader>
               <CardContent>
                 {noticeType === 'first' ? (
-                  <NoticeOne 
-                    complaint={complaint} 
+                  <NoticeOne
+                    complaint={complaint}
                     user={user}
-                    onApprovalAction={(stage) => handleApprovalAction('notice1', stage)}
-                    onRejectionAction={(stage, reason) => handleRejectionAction('notice1', stage, reason)}
+                    onApprovalAction={(stage) => handleApprovalAction('notice1', stage as 'dcp' | 'acp' | 'commissioner')}
+                    onRejectionAction={(stage, reason) => handleRejectionAction('notice1', stage as 'dcp' | 'acp' | 'commissioner', reason || '')}
                   />
                 ) : (
-                  <NoticeTwo 
-                    complaint={complaint} 
+                  <NoticeTwo
+                    complaint={complaint}
                     user={user}
-                    onApprovalAction={(stage) => handleApprovalAction('notice2', stage)}
-                    onRejectionAction={(stage, reason) => handleRejectionAction('notice2', stage, reason)}
+                    onApprovalAction={(stage) => handleApprovalAction('notice2', stage as 'dcp' | 'acp' | 'commissioner')}
+                    onRejectionAction={(stage, reason) => handleRejectionAction('notice2', stage as 'dcp' | 'acp' | 'commissioner', reason || '')}
                   />
                 )}
               </CardContent>
@@ -1017,6 +1354,8 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
             </CardContent>
           </Card>
         </TabsContent>
+        </>
+        )}
       </Tabs>
     </div>
   );

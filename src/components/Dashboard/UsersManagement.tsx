@@ -223,7 +223,7 @@ export default function UsersManagement({ users: initialUsers }: UsersManagement
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="COMPLAINANT">Complainant</SelectItem>
-                      <SelectItem value="FIELD_OFFICER">Field Officer</SelectItem>
+                      <SelectItem value="INVESTIGATION_OFFICER">Investigation Officer</SelectItem>
                       <SelectItem value="DCP">DCP</SelectItem>
                       <SelectItem value="ACP">ACP</SelectItem>
                       <SelectItem value="COMMISSIONER">Commissioner</SelectItem>
@@ -439,7 +439,7 @@ export default function UsersManagement({ users: initialUsers }: UsersManagement
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="COMPLAINANT">Complainant</SelectItem>
-                    <SelectItem value="FIELD_OFFICER">Field Officer</SelectItem>
+                    <SelectItem value="INVESTIGATION_OFFICER">Investigation Officer</SelectItem>
                     <SelectItem value="DCP">DCP</SelectItem>
                     <SelectItem value="ACP">ACP</SelectItem>
                     <SelectItem value="COMMISSIONER">Commissioner</SelectItem>

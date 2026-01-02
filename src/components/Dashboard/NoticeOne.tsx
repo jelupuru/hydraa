@@ -13,7 +13,7 @@ interface NoticeOneProps {
     createdAt: Date;
     fieldVisitDate: Date | null;
     // Approval workflow fields for Notice 1
-    notice1ApprovalStatus?: string;
+    notice1ApprovalStatus?: string | null;
     notice1DcpApprovalDate?: Date | null;
     notice1DcpApprovedBy?: any;
     notice1AcpApprovalDate?: Date | null;
@@ -62,15 +62,15 @@ const NoticeOne = ({ complaint, user, onApprovalAction, onRejectionAction }: Not
               <ApprovalWorkflow
                 noticeType="notice1"
                 status={(complaint.notice1ApprovalStatus as any) || 'PENDING'}
-                dcpApprovalDate={complaint.notice1DcpApprovalDate}
+                dcpApprovalDate={complaint.notice1DcpApprovalDate || undefined}
                 dcpApprovedBy={complaint.notice1DcpApprovedBy}
-                acpApprovalDate={complaint.notice1AcpApprovalDate}
+                acpApprovalDate={complaint.notice1AcpApprovalDate || undefined}
                 acpApprovedBy={complaint.notice1AcpApprovedBy}
-                commissionerApprovalDate={complaint.notice1CommissionerApprovalDate}
+                commissionerApprovalDate={complaint.notice1CommissionerApprovalDate || undefined}
                 commissionerApprovedBy={complaint.notice1CommissionerApprovedBy}
-                rejectionDate={complaint.notice1RejectionDate}
+                rejectionDate={complaint.notice1RejectionDate || undefined}
                 rejectedBy={complaint.notice1RejectedBy}
-                rejectionReason={complaint.notice1RejectionReason}
+                rejectionReason={complaint.notice1RejectionReason || undefined}
                 userRole={user.role}
                 onApprove={onApprovalAction || (() => {})}
                 onReject={onRejectionAction || (() => {})}

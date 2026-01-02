@@ -237,7 +237,7 @@ const NoticeApproval: React.FC<NoticeApprovalProps> = ({
       )}
 
       {/* Instructions for Investigation Officers */}
-      {userRole === 'FIELD_OFFICER' && (
+      {userRole === 'INVESTIGATION_OFFICER' && (
         <Card>
           <CardHeader>
             <CardTitle className="text-blue-600">Instructions</CardTitle>

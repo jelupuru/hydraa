@@ -33,12 +33,54 @@ type ComplaintWithRelations = Complaint & {
   firs?: any[];
   comments?: any[];
   noticeContent?: string; // Added property
+  // Notice fields
+  firstNoticeNumber?: string | null;
+  firstNoticeDate?: Date | null;
+  secondNoticeNumber?: string | null;
+  secondNoticeDate?: Date | null;
+  // Notice 1 approval fields
+  notice1ApprovalStatus?: string | null;
+  notice1DcpApprovalDate?: Date | null;
+  notice1AcpApprovalDate?: Date | null;
+  notice1CommissionerApprovalDate?: Date | null;
+  notice1RejectionDate?: Date | null;
+  notice1RejectionReason?: string | null;
+  notice1CommissionerApprovedBy?: { name: string } | null;
+  notice1AcpApprovedBy?: { name: string } | null;
+  notice1DcpApprovedBy?: { name: string } | null;
+  notice1RejectedBy?: { name: string } | null;
+  // Notice 2 approval fields  
+  notice2ApprovalStatus?: string | null;
+  notice2DcpApprovalDate?: Date | null;
+  notice2AcpApprovalDate?: Date | null;
+  notice2CommissionerApprovalDate?: Date | null;
+  notice2RejectionDate?: Date | null;
+  notice2RejectionReason?: string | null;
+  notice2CommissionerApprovedBy?: { name: string } | null;
+  notice2AcpApprovedBy?: { name: string } | null;
+  notice2DcpApprovedBy?: { name: string } | null;
+  notice2RejectedBy?: { name: string } | null;
+  // PE Report fields
+  peReport?: string | null;
+  fieldVisitDate?: Date | null;
+  peStatus?: string | null;
+  // PE Workflow fields
+  peDcpComments?: string | null;
+  peDcpCommentsDate?: Date | null;
+  peDcpCommentedBy?: { name: string } | null;
+  peNotificationSentToFieldOfficer?: boolean;
+  peNotificationDate?: Date | null;
+  peNotificationBy?: { name: string } | null;
+  // Notice sent dates
+  firstNoticeSentDate?: Date | null;
+  secondNoticeSentDate?: Date | null;
 };
 
 export default function ComplaintsManagement({ user }: ComplaintsManagementProps) {
   const router = useRouter();
   const [complaints, setComplaints] = useState<ComplaintWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedComplaint, setSelectedComplaint] = useState<ComplaintWithRelations | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showCreateFIRDialog, setShowCreateFIRDialog] = useState(false);
@@ -56,6 +98,40 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
   });
   const [isCreatingFIR, setIsCreatingFIR] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    status: '',
+    priority: '',
+    peStatus: '',
+    noticeStatus: '',
+    overdue: false,
+    dateRange: { start: '', end: '' },
+    createdBy: ''
+  });
+  const [filteredComplaints, setFilteredComplaints] = useState<ComplaintWithRelations[]>([]);
+
+  // Helper function to check if notice is overdue (3+ days without reply)
+  const isNoticeOverdue = (complaint: ComplaintWithRelations): boolean => {
+    if (!complaint.firstNoticeSentDate) return false;
+    
+    const sentDate = new Date(complaint.firstNoticeSentDate);
+    const now = new Date();
+    const daysDiff = Math.floor((now.getTime() - sentDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Consider overdue if 3+ days and no response received
+    // You might want to add a field for response tracking
+    return daysDiff >= 3;
+  };
+
+  // Helper function to get days since notice sent
+  const getDaysSinceNoticeSent = (complaint: ComplaintWithRelations): number => {
+    if (!complaint.firstNoticeSentDate) return 0;
+    
+    const sentDate = new Date(complaint.firstNoticeSentDate);
+    const now = new Date();
+    return Math.floor((now.getTime() - sentDate.getTime()) / (1000 * 60 * 60 * 24));
+  };
   const [showAddCommentModal, setShowAddCommentModal] = useState(false);
   const [showAddFIRModal, setShowAddFIRModal] = useState(false);
   const [showAddInvestigationModal, setShowAddInvestigationModal] = useState(false);
@@ -64,15 +140,80 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
     fetchComplaints();
   }, [user.role]);
 
+  // Filter complaints based on selected filters
+  useEffect(() => {
+    let filtered = [...complaints];
+
+    // Status filter
+    if (filters.status) {
+      filtered = filtered.filter(c => c.finalStatus === filters.status);
+    }
+
+    // Priority filter
+    if (filters.priority) {
+      filtered = filtered.filter(c => c.complaintPriority === filters.priority);
+    }
+
+    // PE Status filter
+    if (filters.peStatus) {
+      filtered = filtered.filter(c => c.peStatus === filters.peStatus);
+    }
+
+    // Notice Status filter
+    if (filters.noticeStatus) {
+      if (filters.noticeStatus === 'SENT') {
+        filtered = filtered.filter(c => c.firstNoticeSentDate);
+      } else if (filters.noticeStatus === 'NOT_SENT') {
+        filtered = filtered.filter(c => c.firstNoticeNumber && !c.firstNoticeSentDate);
+      } else if (filters.noticeStatus === 'PENDING_GENERATION') {
+        filtered = filtered.filter(c => !c.firstNoticeNumber);
+      }
+    }
+
+    // Overdue filter
+    if (filters.overdue) {
+      filtered = filtered.filter(c => isNoticeOverdue(c));
+    }
+
+    // Date range filter
+    if (filters.dateRange.start) {
+      const startDate = new Date(filters.dateRange.start);
+      filtered = filtered.filter(c => new Date(c.createdAt) >= startDate);
+    }
+    if (filters.dateRange.end) {
+      const endDate = new Date(filters.dateRange.end);
+      filtered = filtered.filter(c => new Date(c.createdAt) <= endDate);
+    }
+
+    // Created by filter
+    if (filters.createdBy) {
+      filtered = filtered.filter(c => 
+        c.createdBy.name?.toLowerCase().includes(filters.createdBy.toLowerCase())
+      );
+    }
+
+    setFilteredComplaints(filtered);
+  }, [complaints, filters]);
+
   const fetchComplaints = async () => {
     try {
+      setError(null);
+      console.log('Fetching complaints for role:', user.role);
       const response = await fetch(`/api/complaints?role=${user.role}`);
+      console.log('Response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('Fetched complaints:', data.length);
         setComplaints(data);
+      } else {
+        const errorData = await response.text();
+        console.error('Failed to fetch complaints:', response.status, errorData);
+        setError(`Failed to fetch complaints: ${response.status} - ${errorData}`);
       }
     } catch (error) {
       console.error('Error fetching complaints:', error);
+      setError('Network error occurred while fetching complaints');
     } finally {
       setLoading(false);
     }
@@ -125,9 +266,9 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
 
   const canUpdateComplaint = (complaintStatus: ComplaintStatus, userRole: string): boolean => {
     switch (userRole) {
-      case 'FIELD_OFFICER':
+      case 'INVESTIGATION_OFFICER':
       case 'COMPLAINANT':
-        return true; // Allow field officers and complainants to update complaints
+        return true; // Allow investigation officers and complainants to update complaints
       case 'DCP':
         return complaintStatus === ComplaintStatus.PENDING || complaintStatus === ComplaintStatus.UNDER_REVIEW_DCP;
       case 'ACP':
@@ -141,7 +282,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
 
   const getNextStatus = (userRole: string): ComplaintStatus => {
     switch (userRole) {
-      case 'FIELD_OFFICER':
+      case 'INVESTIGATION_OFFICER':
       case 'COMPLAINANT':
         return ComplaintStatus.UNDER_REVIEW_DCP;
       case 'DCP':
@@ -157,7 +298,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
 
   const getNextAssigneeRole = (userRole: string): string => {
     switch (userRole) {
-      case 'FIELD_OFFICER':
+      case 'INVESTIGATION_OFFICER':
       case 'COMPLAINANT':
         return 'DCP';
       case 'DCP':
@@ -174,7 +315,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
   };
 
   const canCreateFIR = (userRole: string): boolean => {
-    return ['FIELD_OFFICER', 'DCP', 'ACP', 'COMMISSIONER', 'SUPER_ADMIN'].includes(userRole);
+    return ['INVESTIGATION_OFFICER', 'DCP', 'ACP', 'COMMISSIONER', 'SUPER_ADMIN'].includes(userRole);
   };
 
   const handleCreateFIR = (complaint: ComplaintWithRelations) => {
@@ -294,6 +435,20 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
     return <div className="flex items-center justify-center h-64">Loading complaints...</div>;
   }
 
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <div className="text-red-600 mb-4">Error: {error}</div>
+        <Button onClick={() => {
+          setLoading(true);
+          fetchComplaints();
+        }}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -303,7 +458,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
             Manage and track complaint progress through the system.
           </p>
         </div>
-        {(user.role === 'FIELD_OFFICER' || user.role === 'COMPLAINANT') && (
+        {(user.role === 'INVESTIGATION_OFFICER' || user.role === 'COMPLAINANT') && (
           <Sheet open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <SheetTrigger asChild>
               <Button>
@@ -341,11 +496,145 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
             A list of all complaints in the system that you have access to.
           </CardDescription>
         </CardHeader>
+        
+        {/* Comprehensive Filters */}
+        <div className="px-6 pb-4 border-b border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            {/* Status Filter */}
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Status</label>
+              <select 
+                value={filters.status}
+                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md"
+              >
+                <option value="">All Status</option>
+                <option value="PENDING">Pending</option>
+                <option value="UNDER_REVIEW_DCP">Under DCP Review</option>
+                <option value="UNDER_REVIEW_ACP">Under ACP Review</option>
+                <option value="UNDER_REVIEW_COMMISSIONER">Under Commissioner Review</option>
+                <option value="RESOLVED">Resolved</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+            </div>
+
+            {/* Priority Filter */}
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Priority</label>
+              <select 
+                value={filters.priority}
+                onChange={(e) => setFilters(prev => ({ ...prev, priority: e.target.value }))}
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md"
+              >
+                <option value="">All Priority</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+                <option value="URGENT">Urgent</option>
+              </select>
+            </div>
+
+            {/* PE Status Filter */}
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">PE Status</label>
+              <select 
+                value={filters.peStatus}
+                onChange={(e) => setFilters(prev => ({ ...prev, peStatus: e.target.value }))}
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md"
+              >
+                <option value="">All PE Status</option>
+                <option value="PENDING">Pending</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="SCHEDULED">Scheduled</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="SUBMITTED">Submitted</option>
+              </select>
+            </div>
+
+            {/* Notice Status Filter */}
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Notice Status</label>
+              <select 
+                value={filters.noticeStatus}
+                onChange={(e) => setFilters(prev => ({ ...prev, noticeStatus: e.target.value }))}
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md"
+              >
+                <option value="">All Notices</option>
+                <option value="PENDING_GENERATION">Pending Generation</option>
+                <option value="NOT_SENT">Generated, Not Sent</option>
+                <option value="SENT">Sent to Citizen</option>
+              </select>
+            </div>
+
+            {/* Overdue Filter */}
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Overdue</label>
+              <label className="flex items-center text-xs">
+                <input 
+                  type="checkbox"
+                  checked={filters.overdue}
+                  onChange={(e) => setFilters(prev => ({ ...prev, overdue: e.target.checked }))}
+                  className="mr-1"
+                />
+                Show Overdue Only
+              </label>
+            </div>
+
+            {/* Date Range */}
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Date From</label>
+              <input 
+                type="date"
+                value={filters.dateRange.start}
+                onChange={(e) => setFilters(prev => ({ 
+                  ...prev, 
+                  dateRange: { ...prev.dateRange, start: e.target.value }
+                }))}
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Date To</label>
+              <input 
+                type="date"
+                value={filters.dateRange.end}
+                onChange={(e) => setFilters(prev => ({ 
+                  ...prev, 
+                  dateRange: { ...prev.dateRange, end: e.target.value }
+                }))}
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md"
+              />
+            </div>
+          </div>
+          
+          {/* Filter Summary */}
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+            <div className="text-xs text-gray-600">
+              Showing {filteredComplaints.length} of {complaints.length} complaints
+              {filters.overdue && ` • ${filteredComplaints.filter(c => isNoticeOverdue(c)).length} overdue`}
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setFilters({
+                status: '', priority: '', peStatus: '', noticeStatus: '', overdue: false,
+                dateRange: { start: '', end: '' }, createdBy: ''
+              })}
+            >
+              Clear Filters
+            </Button>
+          </div>
+        </div>
+        
         <CardContent>
-          {complaints.length === 0 ? (
+          {filteredComplaints.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">No complaints found.</p>
-              {(user.role === 'FIELD_OFFICER' || user.role === 'COMPLAINANT') && (
+              <p className="text-muted-foreground">
+                {complaints.length === 0 ? 'No complaints found.' : 'No complaints match the selected filters.'}
+              </p>
+              <p className="text-sm text-gray-500 mt-2">Your role: {user.role}</p>
+              {(user.role === 'INVESTIGATION_OFFICER' || user.role === 'COMPLAINANT') && complaints.length === 0 && (
                 <Button
                   variant="outline"
                   className="mt-4"
@@ -361,145 +650,194 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
                 <TableRow>
                   <TableHead>Complaint ID</TableHead>
                   <TableHead>Title</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Attachments</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>PE Status</TableHead>
+                  <TableHead>Notice 1 Status</TableHead>
+                  <TableHead>Notice 2 Status</TableHead>
+                  <TableHead>Speaking Order Status</TableHead>
+                  <TableHead>Created By</TableHead>
+                  <TableHead>Created Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {complaints.map((complaint) => (
-                  <TableRow key={complaint.id}>
-                    <TableCell className="font-medium text-blue-600">
-                      {complaint.complaintId || complaint.complaintUniqueId || `#${complaint.id}`}
-                    </TableCell>
-                    <TableCell className="font-medium">{complaint.natureOfComplaint || 'Untitled Complaint'}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusBadgeVariant(complaint.finalStatus)}>
-                        {complaint.finalStatus?.replace('_', ' ') || 'Unknown Status'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {complaint.attachments && complaint.attachments.length > 0 ? (
-                        <div>
-                          <span className="text-sm">
-                            {complaint.attachments.length} file{complaint.attachments.length > 1 ? 's' : ''}
-                          </span>
-                          <Button
-                            variant="link"
-                            size="sm"
-                            onClick={() => {
-                              console.log('Button clicked for complaint:', complaint);
-                              setSelectedComplaint(complaint);
-                            }}
-                            className="hover:cursor-pointer"
-                          >
-                            <Paperclip className="h-4 w-4 text-blue-500" />
-                          </Button>
-                          {selectedComplaint?.id === complaint.id && (
-                            <Dialog open={true} onOpenChange={() => setSelectedComplaint(null)}>
-                              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                                <DialogHeader>
-                                  <DialogTitle>Attachments</DialogTitle>
-                                  <DialogDescription>
-                                    Attachments for complaint #{complaint.complaintId}
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <div className="p-4">
-                                  <ul className="list-disc list-inside space-y-2">
-                                    {complaint.attachments.map((attachment) => (
-                                      <li key={attachment.id}>
-                                        <a
-                                          href={attachment.url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-blue-600 hover:underline"
-                                        >
-                                          {attachment.filename}
-                                        </a>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              </DialogContent>
-                            </Dialog>
+                {filteredComplaints.map((complaint) => {
+                  const isOverdue = isNoticeOverdue(complaint);
+                  const daysSinceSent = getDaysSinceNoticeSent(complaint);
+                  
+                  return (
+                    <TableRow 
+                      key={complaint.id} 
+                      className={`cursor-pointer hover:bg-gray-50 ${
+                        isOverdue ? 'bg-red-50 border-l-4 border-l-red-500' : ''
+                      }`} 
+                      onClick={() => handleViewDetails(complaint)}
+                    >
+                      <TableCell className="font-medium text-blue-600">
+                        <div className="flex items-center gap-2">
+                          {complaint.complaintId || complaint.complaintUniqueId || `#${complaint.id}`}
+                          {isOverdue && (
+                            <Badge variant="destructive" className="text-xs animate-pulse">
+                              OVERDUE {daysSinceSent}d
+                            </Badge>
                           )}
                         </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">None</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(complaint.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleViewDetails(complaint)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-
-                        {canCreateFIR(user.role) && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleCreateFIR(complaint)}
-                            title="Create FIR"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                        )}
-
-                        {complaint.finalStatus && canUpdateComplaint(complaint.finalStatus, user.role) && (
-                          <div className="flex gap-1">
-                            {user.role === 'COMMISSIONER' ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  onClick={() => updateComplaint(complaint.id, { finalStatus: ComplaintStatus.RESOLVED })}
-                                  className="bg-green-600 hover:bg-green-700"
-                                >
-                                  <CheckCircle className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => updateComplaint(complaint.id, { finalStatus: ComplaintStatus.REJECTED })}
-                                >
-                                  <XCircle className="h-4 w-4" />
-                                </Button>
-                              </>
-                            ) : (user.role === 'FIELD_OFFICER' || user.role === 'COMPLAINANT') ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => updateComplaint(complaint.id, { finalStatus: ComplaintStatus.UNDER_REVIEW_DCP })}
-                                >
-                                  Review
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  onClick={() => updateComplaint(complaint.id, { finalStatus: getNextStatus(user.role), assignedToRole: getNextAssigneeRole(user.role) })}
-                                >
-                                  <ArrowRight className="h-4 w-4" />
-                                  Forward to DCP
-                                </Button>
-                              </>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => updateComplaint(complaint.id, { finalStatus: getNextStatus(user.role), assignedToRole: getNextAssigneeRole(user.role) })}
-                              >
-                                <ArrowRight className="h-4 w-4" />
-                                Forward
-                              </Button>
-                            )}
+                      </TableCell>
+                    <TableCell className="font-medium">{complaint.natureOfComplaint || 'Untitled Complaint'}</TableCell>
+                    
+                    {/* Enhanced PE Status with details */}
+                    <TableCell className="min-w-[200px]">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          {complaint.peStatus === 'COMPLETED' ? (
+                            <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">
+                              ✓ PE Completed
+                            </Badge>
+                          ) : complaint.peStatus === 'SUBMITTED' ? (
+                            <Badge variant="default" className="text-xs bg-blue-600 hover:bg-blue-700">
+                              Submitted for Review
+                            </Badge>
+                          ) : complaint.peStatus === 'REVIEWED' ? (
+                            <Badge variant="default" className="text-xs bg-purple-600 hover:bg-purple-700">
+                              Under Review
+                            </Badge>
+                          ) : complaint.peStatus === 'DRAFT' ? (
+                            <Badge variant="secondary" className="text-xs">
+                              Draft
+                            </Badge>
+                          ) : complaint.fieldVisitDate ? (
+                            <Badge variant="outline" className="text-xs bg-yellow-50">
+                              Field Visit Done
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              Not Started
+                            </Badge>
+                          )}
+                        </div>
+                        {complaint.fieldVisitDate && (
+                          <div className="text-xs text-gray-600">
+                            Visit: {new Date(complaint.fieldVisitDate).toLocaleDateString()}
                           </div>
                         )}
                       </div>
                     </TableCell>
+                    
+                    {/* Enhanced Notice 1 Status with details */}
+                    <TableCell className="min-w-[250px]">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          {!complaint.firstNoticeNumber && !complaint.firstNoticeDate ? (
+                            <Badge variant="outline" className="text-xs">
+                              Not Generated
+                            </Badge>
+                          ) : complaint.notice1RejectionDate ? (
+                            <Badge variant="destructive" className="text-xs">
+                              ✗ Rejected
+                            </Badge>
+                          ) : complaint.notice1CommissionerApprovalDate ? (
+                            <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">
+                              ✓ Fully Approved
+                            </Badge>
+                          ) : complaint.notice1AcpApprovalDate ? (
+                            <Badge variant="default" className="text-xs bg-blue-600 hover:bg-blue-700">
+                              Commissioner Pending
+                            </Badge>
+                          ) : complaint.notice1DcpApprovalDate ? (
+                            <Badge variant="default" className="text-xs bg-yellow-600 hover:bg-yellow-700">
+                              ACP Pending
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              DCP Pending
+                            </Badge>
+                          )}
+                        </div>
+                        {complaint.firstNoticeDate && (
+                          <div className="text-xs text-gray-600">
+                            Generated: {new Date(complaint.firstNoticeDate).toLocaleDateString()}
+                          </div>
+                        )}
+                        {complaint.notice1CommissionerApprovalDate && complaint.notice1CommissionerApprovedBy && (
+                          <div className="text-xs text-gray-600">
+                            Approved by: {complaint.notice1CommissionerApprovedBy.name}<br/>
+                            Date: {new Date(complaint.notice1CommissionerApprovalDate).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    
+                    {/* Enhanced Notice 2 Status with details */}
+                    <TableCell className="min-w-[250px]">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          {!complaint.secondNoticeNumber && !complaint.secondNoticeDate ? (
+                            <Badge variant="outline" className="text-xs">
+                              Not Generated
+                            </Badge>
+                          ) : complaint.notice2RejectionDate ? (
+                            <Badge variant="destructive" className="text-xs">
+                              ✗ Rejected
+                            </Badge>
+                          ) : complaint.notice2CommissionerApprovalDate ? (
+                            <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">
+                              ✓ Fully Approved
+                            </Badge>
+                          ) : complaint.notice2AcpApprovalDate ? (
+                            <Badge variant="default" className="text-xs bg-blue-600 hover:bg-blue-700">
+                              Commissioner Pending
+                            </Badge>
+                          ) : complaint.notice2DcpApprovalDate ? (
+                            <Badge variant="default" className="text-xs bg-yellow-600 hover:bg-yellow-700">
+                              ACP Pending
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              DCP Pending
+                            </Badge>
+                          )}
+                        </div>
+                        {complaint.secondNoticeDate && (
+                          <div className="text-xs text-gray-600">
+                            Generated: {new Date(complaint.secondNoticeDate).toLocaleDateString()}
+                          </div>
+                        )}
+                        {complaint.notice2CommissionerApprovalDate && complaint.notice2CommissionerApprovedBy && (
+                          <div className="text-xs text-gray-600">
+                            Approved by: {complaint.notice2CommissionerApprovedBy.name}<br/>
+                            Date: {new Date(complaint.notice2CommissionerApprovalDate).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    
+                    {/* Speaking Order Status (placeholder for now) */}
+                    <TableCell className="min-w-[200px]">
+                      <div className="space-y-1">
+                        <Badge variant="outline" className="text-xs">
+                          Not Generated
+                        </Badge>
+                        <div className="text-xs text-gray-500">
+                          Speaking Order functionality pending
+                        </div>
+                      </div>
+                    </TableCell>
+                    
+                    {/* Created By */}
+                    <TableCell>
+                      <div className="text-sm">
+                        <div className="font-medium">{complaint.createdBy.name}</div>
+                        <div className="text-xs text-gray-500">{complaint.createdBy.role}</div>
+                      </div>
+                    </TableCell>
+                    
+                    {/* Created Date */}
+                    <TableCell>
+                      <div className="text-sm">
+                        {new Date(complaint.createdAt).toLocaleDateString()}
+                      </div>
+                    </TableCell>
                   </TableRow>
-                ))}
+                );
+                })}
               </TableBody>
             </Table>
           )}

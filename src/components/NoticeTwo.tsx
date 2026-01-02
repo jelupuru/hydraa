@@ -20,7 +20,7 @@ interface Complaint {
   secondNoticeNumber?: string | null;
   secondNoticeDate?: Date | null;
   // Approval workflow fields for Notice 2
-  notice2ApprovalStatus?: string;
+  notice2ApprovalStatus?: string | null;
   notice2DcpApprovalDate?: Date | null;
   notice2DcpApprovedBy?: any;
   notice2AcpApprovalDate?: Date | null;
@@ -277,15 +277,15 @@ const NoticeTwo: React.FC<NoticeProps> = ({ complaint, user, onApprovalAction, o
               <ApprovalWorkflow
                 noticeType="notice2"
                 status={(complaint.notice2ApprovalStatus as any) || 'PENDING'}
-                dcpApprovalDate={complaint.notice2DcpApprovalDate}
+                dcpApprovalDate={complaint.notice2DcpApprovalDate || undefined}
                 dcpApprovedBy={complaint.notice2DcpApprovedBy}
-                acpApprovalDate={complaint.notice2AcpApprovalDate}
+                acpApprovalDate={complaint.notice2AcpApprovalDate || undefined}
                 acpApprovedBy={complaint.notice2AcpApprovedBy}
-                commissionerApprovalDate={complaint.notice2CommissionerApprovalDate}
+                commissionerApprovalDate={complaint.notice2CommissionerApprovalDate || undefined}
                 commissionerApprovedBy={complaint.notice2CommissionerApprovedBy}
-                rejectionDate={complaint.notice2RejectionDate}
+                rejectionDate={complaint.notice2RejectionDate || undefined}
                 rejectedBy={complaint.notice2RejectedBy}
-                rejectionReason={complaint.notice2RejectionReason}
+                rejectionReason={complaint.notice2RejectionReason || undefined}
                 userRole={user.role}
                 onApprove={onApprovalAction || (() => {})}
                 onReject={onRejectionAction || (() => {})}

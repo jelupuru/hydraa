@@ -206,7 +206,7 @@ function canUpdateComplaint(userRole: Role, complaintStatus: ComplaintStatus | n
   if (!complaintStatus) return true; // Can update if no status set
 
   switch (userRole) {
-    case 'FIELD_OFFICER':
+    case 'INVESTIGATION_OFFICER':
       return complaintStatus === 'PENDING';
     case 'DCP':
       return ['PENDING', 'UNDER_REVIEW_DCP'].includes(complaintStatus);

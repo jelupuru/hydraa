@@ -65,7 +65,7 @@ const menuItems = [
     title: "Settings",
     href: "/dashboard/settings",
     icon: Settings,
-    roles: ["SUPER_ADMIN", "COMMISSIONER", "DCP", "ACP", "FIELD_OFFICER"], // Not for COMPLAINANT
+    roles: ["SUPER_ADMIN", "COMMISSIONER", "DCP", "ACP", "INVESTIGATION_OFFICER"], // Not for COMPLAINANT
   },
 ];
 

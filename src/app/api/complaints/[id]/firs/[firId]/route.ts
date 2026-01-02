@@ -42,7 +42,7 @@ export async function GET(
     }
 
     // Check permissions - users can only see FIRs for complaints they have access to
-    if (user.role === 'FIELD_OFFICER' && fir.createdById !== user.id) {
+    if (user.role === 'INVESTIGATION_OFFICER' && fir.createdById !== user.id) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 

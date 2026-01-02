@@ -122,7 +122,7 @@ export async function POST(
         stage,
         rejectionReason,
         userId: session.user.id,
-        userRole: session.user.role
+        userRole: session.user.role as string
       });
     }
 
@@ -154,8 +154,8 @@ export async function POST(
     }
 
     // Check user permissions (investigation officers and above can create notices)
-    const allowedRoles = ['FIELD_OFFICER', 'DCP', 'ACP', 'COMMISSIONER', 'SUPER_ADMIN'];
-    if (!allowedRoles.includes(session.user.role)) {
+    const allowedRoles = ['INVESTIGATION_OFFICER', 'DCP', 'ACP', 'COMMISSIONER', 'SUPER_ADMIN'];
+    if (!allowedRoles.includes(session.user.role as string)) {
       return NextResponse.json(
         { error: 'Insufficient permissions to create notices' },
         { status: 403 }
@@ -208,7 +208,7 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -216,7 +216,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const complaintId = parseInt(params.id);
+    const resolvedParams = await params;
+    const complaintId = parseInt(resolvedParams.id);
 
     const complaint = await prisma.complaint.findUnique({
       where: { id: complaintId },

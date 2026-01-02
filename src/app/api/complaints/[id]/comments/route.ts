@@ -37,7 +37,7 @@ export async function GET(
     }
 
     // Check permissions - users can only see comments for complaints they have access to
-    if (user.role === 'FIELD_OFFICER' && complaint.createdById !== user.id) {
+    if (user.role === 'INVESTIGATION_OFFICER' && complaint.createdById !== user.id) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
