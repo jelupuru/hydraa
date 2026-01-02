@@ -52,8 +52,8 @@ export const BlockDiscussion: RenderNodeWrapper<AnyPluginConfig> = (props) => {
   const commentsApi = editor.getApi(CommentPlugin).comment;
   const blockPath = editor.api.findPath(element);
 
-  // avoid duplicate in table or column
-  if (!blockPath || blockPath.length > 1) return;
+  // only skip if no path found; allow nested layouts so comments render everywhere
+  if (!blockPath) return;
 
   const draftCommentNode = commentsApi.node({ at: blockPath, isDraft: true });
 

@@ -34,6 +34,10 @@ type ComplaintWithRelations = {
   modeOfComplaint: string | null;
   noticeStatus: string | null;
   peReport: string | null;
+  firstNoticeNumber?: string | null;
+  firstNoticeDate?: Date | null;
+  firstNoticeContent?: string | null;
+  firstNoticeDiscussions?: string | null;
   fieldVisitDate: Date | null;
   peStatus: string | null;
   createdBy: User;

@@ -89,6 +89,11 @@ const PlatePEEditor = React.forwardRef<PlatePEEditorHandle, PlatePEEditorProps>(
       return normalizeNodeId(nodes as any);
     }, [initialHtml]);
 
+    const initialContentSnapshot = React.useRef<string>(JSON.stringify(value));
+    const lastSavedContent = React.useRef<string>(initialContentSnapshot.current);
+    const lastSavedDiscussions = React.useRef<string>('');
+    const autoSaveTimer = React.useRef<NodeJS.Timeout | null>(null);
+
     const editor = usePlateEditor({ 
       plugins: EditorKit, 
       value,
@@ -97,7 +102,6 @@ const PlatePEEditor = React.forwardRef<PlatePEEditorHandle, PlatePEEditorProps>(
 
     // Configure discussion plugin with current user (only once on mount)
     const discussionsInitialized = React.useRef(false);
-    const lastSavedDiscussions = React.useRef<string>('');
     
     React.useEffect(() => {
       if (user && editor && !discussionsInitialized.current) {
@@ -152,41 +156,51 @@ const PlatePEEditor = React.forwardRef<PlatePEEditorHandle, PlatePEEditorProps>(
       }
     }, [user, editor, initialDiscussions, usersData]);
 
-    // Auto-save discussions when they change
+    // Cleanup pending autosave on unmount
     React.useEffect(() => {
-      if (!editor || !complaintId || readOnly || !discussionsInitialized.current) return;
+      return () => {
+        if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+      };
+    }, []);
 
-      const checkAndSaveDiscussions = async () => {
-        try {
-          const discussions = editor.getOption(discussionPlugin, 'discussions') || [];
-          const currentDiscussions = JSON.stringify(discussions);
-          
-          // Only save if discussions actually changed
-          if (currentDiscussions !== lastSavedDiscussions.current) {
-            lastSavedDiscussions.current = currentDiscussions;
-            
-            const content = JSON.stringify(editor.children);
-            
+    const scheduleAutoSave = React.useCallback(
+      (contentJson: string, discussionsJson: string) => {
+        if (!complaintId || readOnly) return;
+        if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+
+        autoSaveTimer.current = setTimeout(async () => {
+          try {
             await fetch(`/api/complaints/${complaintId}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                peReport: content,
-                peDiscussions: currentDiscussions
-              }),
+              body: JSON.stringify({ peReport: contentJson, peDiscussions: discussionsJson }),
             });
-            
-            console.log('Auto-saved discussions');
+            lastSavedContent.current = contentJson;
+            lastSavedDiscussions.current = discussionsJson;
+            console.log('[PE Editor] auto-saved content/discussions');
+          } catch (e) {
+            console.error('Error auto-saving PE content/discussions:', e);
           }
-        } catch (e) {
-          console.error('Error auto-saving discussions:', e);
-        }
-      };
+        }, 1200);
+      },
+      [complaintId, readOnly]
+    );
 
-      // Debounce to avoid too many saves - check every 3 seconds
-      const intervalId = setInterval(checkAndSaveDiscussions, 3000);
-      return () => clearInterval(intervalId);
-    }, [editor, complaintId, readOnly]);
+    const handlePlateChange = React.useCallback(
+      ({ editor: plateEditor }: { editor: typeof editor }) => {
+        if (!plateEditor || readOnly || !complaintId) return;
+
+        const contentJson = JSON.stringify(plateEditor.children);
+        const discussionsJson = JSON.stringify(plateEditor.getOption(discussionPlugin, 'discussions') || []);
+        const changed =
+          contentJson !== lastSavedContent.current || discussionsJson !== lastSavedDiscussions.current;
+
+        if (changed) {
+          scheduleAutoSave(contentJson, discussionsJson);
+        }
+      },
+      [complaintId, readOnly, scheduleAutoSave]
+    );
 
     React.useImperativeHandle(ref, () => ({
       getHtml: async () => {
@@ -229,7 +243,7 @@ const PlatePEEditor = React.forwardRef<PlatePEEditorHandle, PlatePEEditorProps>(
             <span>💬 Select text and press <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-muted rounded">Ctrl+Shift+M</kbd> to add comments</span>
           </div>
         )}
-        <Plate editor={editor}>
+        <Plate editor={editor} onChange={handlePlateChange}>
           <EditorContainer>
             <Editor variant="demo" readOnly={readOnly} />
           </EditorContainer>

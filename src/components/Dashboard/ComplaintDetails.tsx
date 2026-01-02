@@ -73,10 +73,12 @@ type ComplaintWithRelations = {
   firstNoticeDate?: Date | null;
   firstNoticeStatus?: string | null;
   firstNoticeContent?: string | null;
+  firstNoticeDiscussions?: string | null;
   secondNoticeNumber?: string | null;
   secondNoticeDate?: Date | null;
   secondNoticeStatus?: string | null;
   secondNoticeContent?: string | null;
+  secondNoticeDiscussions?: string | null;
   noticeApprovalStatus?: string | null;
   // Notice 1 approval fields
   notice1ApprovalStatus?: string | null;
@@ -209,7 +211,18 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
   const [editorMode, setEditorMode] = useState<'plate'>('plate');
   const plateRef = useRef<any>(null);
   const noticeEditorRef = useRef<any>(null);
+  const noticeAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastNoticeContentRef = useRef<{ first?: string; second?: string }>({
+    first: complaint.firstNoticeContent || '',
+    second: complaint.secondNoticeContent || '',
+  });
   const PlatePEEditor = dynamic(() => import('@/components/PlatePEEditor').then((m) => m.default), { ssr: false });
+
+  useEffect(() => {
+    return () => {
+      if (noticeAutoSaveTimer.current) clearTimeout(noticeAutoSaveTimer.current);
+    };
+  }, []);
 
   // Build a PE Report HTML that mimics a bordered enquiry report layout.
   const buildPEReportHtml = (c: ComplaintWithRelations) => {
@@ -547,7 +560,7 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
         </Badge>
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+      <Tabs value={activeTab} defaultValue={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className={`grid w-full ${user.role === 'COMPLAINANT' ? 'grid-cols-1' : 'grid-cols-7'}`}>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           {user.role !== 'COMPLAINANT' && (
@@ -1387,7 +1400,34 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                   complaintId={complaint.id}
                   initialValue={noticeType === 'first' ? complaint.firstNoticeContent || '' : complaint.secondNoticeContent || ''}
                   initialDiscussions={noticeType === 'first' && complaint.firstNoticeDiscussions ? JSON.parse(complaint.firstNoticeDiscussions) : []}
-                  readOnly={['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)}
+                  readOnly={false}
+                  onChange={(json) => {
+                    const key = noticeType === 'first' ? 'first' : 'second';
+                    const field = noticeType === 'first' ? 'firstNoticeContent' : 'secondNoticeContent';
+                    if (noticeAutoSaveTimer.current) clearTimeout(noticeAutoSaveTimer.current);
+
+                    // Skip if unchanged to reduce patch noise
+                    if (json === (lastNoticeContentRef.current[key] || '')) return;
+
+                    noticeAutoSaveTimer.current = setTimeout(async () => {
+                      try {
+                        await handleSaveField(field, json);
+                        lastNoticeContentRef.current[key] = json;
+                        console.log('[Notice Editor] auto-saved content', field);
+                      } catch (e) {
+                        console.error('Auto-saving notice content failed', e);
+                      }
+                    }, 1200);
+                  }}
+                  onDiscussionsChange={async (discussions) => {
+                    try {
+                      const field = noticeType === 'first' ? 'firstNoticeDiscussions' : 'secondNoticeDiscussions';
+                      console.log('[ComplaintDetails] saving discussions', field, discussions);
+                      await handleSaveField(field, JSON.stringify(discussions));
+                    } catch (e) {
+                      console.error('Auto-saving discussions failed', e);
+                    }
+                  }}
                 />
                 {!['DCP', 'ACP', 'COMMISSIONER'].includes(user.role) && (
                 <div className="flex gap-2">
@@ -1495,6 +1535,11 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                   <NoticeOne
                     complaint={complaint}
                     user={user}
+                    usersData={{
+                      ...(complaint.createdBy?.id ? { [complaint.createdBy.id]: { id: complaint.createdBy.id, name: complaint.createdBy.name, email: (complaint.createdBy as any).email, role: complaint.createdBy.role } } : {}),
+                      ...(complaint.assignedTo?.id ? { [complaint.assignedTo.id]: { id: complaint.assignedTo.id, name: complaint.assignedTo.name, email: (complaint.assignedTo as any).email, role: complaint.assignedTo.role } } : {}),
+                      ...(user?.id ? { [user.id]: { id: user.id, name: user.name, email: user.email, role: user.role } } : {}),
+                    }}
                     onApprovalAction={(stage) => handleApprovalAction('notice1', stage as 'dcp' | 'acp' | 'commissioner')}
                     onRejectionAction={(stage, reason) => handleRejectionAction('notice1', stage as 'dcp' | 'acp' | 'commissioner', reason || '')}
                   />

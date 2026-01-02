@@ -202,6 +202,42 @@ export async function GET(
   }
 }
 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const { id } = await params;
+    const complaintId = parseInt(id);
+
+    const complaint = await prisma.complaint.findUnique({ where: { id: complaintId } });
+    if (!complaint) {
+      return NextResponse.json({ error: 'Complaint not found' }, { status: 404 });
+    }
+
+    if (!canDeleteComplaint(user, complaint)) {
+      return NextResponse.json({ error: 'Insufficient permissions to delete complaint' }, { status: 403 });
+    }
+
+    await prisma.complaint.delete({ where: { id: complaintId } });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting complaint:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 function canUpdateComplaint(userRole: Role, complaintStatus: ComplaintStatus | null): boolean {
   if (!complaintStatus) return true; // Can update if no status set
 
@@ -219,4 +255,27 @@ function canUpdateComplaint(userRole: Role, complaintStatus: ComplaintStatus | n
     default:
       return false;
   }
+}
+
+function canDeleteComplaint(
+  user: { id: string; role: Role },
+  complaint: { createdById: string; finalStatus: ComplaintStatus | null }
+): boolean {
+  if (user.role === 'SUPER_ADMIN') return true;
+  if (user.role === 'INVESTIGATION_OFFICER') return true;
+
+  const blockedStatuses: ComplaintStatus[] = [
+    'RESOLVED',
+    'CLOSED',
+    'INVESTIGATION_IN_PROGRESS',
+    'UNDER_REVIEW_DCP',
+    'UNDER_REVIEW_ACP',
+    'UNDER_REVIEW_COMMISSIONER',
+  ];
+
+  if (user.role === 'COMPLAINANT' && user.id === complaint.createdById) {
+    return !blockedStatuses.includes(complaint.finalStatus || 'PENDING');
+  }
+
+  return false;
 }

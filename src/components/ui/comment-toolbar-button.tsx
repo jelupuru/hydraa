@@ -14,7 +14,9 @@ export function CommentToolbarButton() {
 
   return (
     <ToolbarButton
-      onClick={() => {
+      onMouseDown={(e) => {
+        e.preventDefault(); // keep selection
+        editor.tf.focus();
         editor.getTransforms(commentPlugin).comment.setDraft();
       }}
       data-plate-prevent-overlay

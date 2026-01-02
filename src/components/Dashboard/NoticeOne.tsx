@@ -12,6 +12,7 @@ import { createPlateEditor } from 'platejs/react';
 import { EditorKit } from '../editor-kit';
 
 const PlateNoticeViewer = dynamic(() => import('@/components/PlateNoticeViewer').then((m) => m.PlateNoticeViewer), { ssr: false });
+const PlateNoticeEditor = dynamic(() => import('@/components/PlateNoticeEditor').then((m) => m.PlateNoticeEditor), { ssr: false });
 
 interface NoticeOneProps {
   complaint: {
@@ -22,6 +23,8 @@ interface NoticeOneProps {
     detailsOfRespondent: string | null;
     createdAt: Date;
     fieldVisitDate: Date | null;
+    firstNoticeNumber?: string | null;
+    firstNoticeDate?: Date | null;
     firstNoticeContent?: string | null;
     firstNoticeDiscussions?: string | null;
     // Approval workflow fields for Notice 1
@@ -35,19 +38,29 @@ interface NoticeOneProps {
     notice1RejectionDate?: Date | null;
     notice1RejectedBy?: any;
     notice1RejectionReason?: string | null;
+    peNotificationSentToFieldOfficer?: boolean;
   };
   user?: {
-    role: string;
+    id?: string;
+    name?: string | null;
+    email?: string | null;
+    role?: string;
   };
+  usersData?: Record<string, { id: string; name: string; email?: string; role?: string }>;
   onApprovalAction?: (stage: string) => void;
   onRejectionAction?: (stage: string, reason?: string) => void;
 }
 
-const NoticeOne = ({ complaint, user, onApprovalAction, onRejectionAction }: NoticeOneProps) => {
+const NoticeOne = ({ complaint, user, usersData, onApprovalAction, onRejectionAction }: NoticeOneProps) => {
   const printRef = useRef<HTMLDivElement>(null);
   const [reviewComments, setReviewComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const noticeAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingContentRef = useRef<string>(complaint.firstNoticeContent || '');
+  const pendingDiscussionsRef = useRef<string>(complaint.firstNoticeDiscussions || '[]');
+  const lastSavedContentRef = useRef<string>(complaint.firstNoticeContent || '');
+  const lastSavedDiscussionsRef = useRef<string>(complaint.firstNoticeDiscussions || '[]');
 
   // Fetch review comments
   useEffect(() => {
@@ -64,6 +77,9 @@ const NoticeOne = ({ complaint, user, onApprovalAction, onRejectionAction }: Not
     };
 
     fetchComments();
+    return () => {
+      if (noticeAutoSaveTimer.current) clearTimeout(noticeAutoSaveTimer.current);
+    };
   }, [complaint.id]);
 
   const handleSubmitComment = async () => {
@@ -112,6 +128,33 @@ const NoticeOne = ({ complaint, user, onApprovalAction, onRejectionAction }: Not
     return `HYDRAA – COMM – Issue of Notice - ${details} at ${location} - Call for documents - Regd.`;
   };
 
+  const currentUserRole = user?.role ?? '';
+
+  const canEdit = ['INVESTIGATION_OFFICER', 'DCP', 'ACP', 'COMMISSIONER'].includes(currentUserRole);
+
+  const scheduleAutoSave = (contentJson: string, discussionsJson: string) => {
+    if (!canEdit) return;
+    if (noticeAutoSaveTimer.current) clearTimeout(noticeAutoSaveTimer.current);
+
+    noticeAutoSaveTimer.current = setTimeout(async () => {
+      try {
+        await fetch(`/api/complaints/${complaint.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            firstNoticeContent: contentJson,
+            firstNoticeDiscussions: discussionsJson,
+          }),
+        });
+        lastSavedContentRef.current = contentJson;
+        lastSavedDiscussionsRef.current = discussionsJson;
+        console.log('[NoticeOne] auto-saved Notice 1 content/discussions');
+      } catch (e) {
+        console.error('Auto-save failed for Notice 1 template', e);
+      }
+    }, 1200);
+  };
+
   const handlePrint = async () => {
     const printContent = printRef.current;
     if (printContent) {
@@ -127,10 +170,11 @@ const NoticeOne = ({ complaint, user, onApprovalAction, onRejectionAction }: Not
             // Create a temporary editor instance for serialization
             const tempEditor = createPlateEditor({
               plugins: [...EditorKit],
+              value: nodes,
             });
             
             // Serialize to HTML
-            const html = await serializeHtml(tempEditor, { nodes });
+            const html = await serializeHtml(tempEditor);
             noticeBodyHtml = html || '<p>No content available</p>';
           } catch (e) {
             console.error('Error converting to HTML:', e);
@@ -414,8 +458,15 @@ const NoticeOne = ({ complaint, user, onApprovalAction, onRejectionAction }: Not
     }
   };
 
+  const showApprovalFlow = ['DCP', 'ACP', 'COMMISSIONER'].includes(currentUserRole) && (onApprovalAction || onRejectionAction);
+
   return (
     <div className="space-y-6">
+      {complaint.peNotificationSentToFieldOfficer && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+          DCP has reviewed the PE report and requested creation of Notice 1.
+        </div>
+      )}
       {/* Print Button */}
       <div className="flex justify-end print:hidden">
         <Button onClick={handlePrint} variant="outline" className="gap-2">
@@ -425,8 +476,7 @@ const NoticeOne = ({ complaint, user, onApprovalAction, onRejectionAction }: Not
       </div>
 
       {/* Approval Workflow Section - Only show if notice is officially created (has notice number) */}
-      {user && user.role && (onApprovalAction || onRejectionAction) && 
-       (complaint.firstNoticeNumber || complaint.firstNoticeDate) && (
+      {showApprovalFlow && (
         <>
           <Card className="print:hidden">
             <CardHeader>
@@ -445,7 +495,7 @@ const NoticeOne = ({ complaint, user, onApprovalAction, onRejectionAction }: Not
                 rejectionDate={complaint.notice1RejectionDate || undefined}
                 rejectedBy={complaint.notice1RejectedBy}
                 rejectionReason={complaint.notice1RejectionReason || undefined}
-                userRole={user.role}
+                userRole={currentUserRole}
                 onApprove={onApprovalAction || (() => {})}
                 onReject={onRejectionAction || (() => {})}
               />
@@ -520,7 +570,41 @@ const NoticeOne = ({ complaint, user, onApprovalAction, onRejectionAction }: Not
           </p>
 
           {complaint.firstNoticeContent ? (
-            <PlateNoticeViewer content={complaint.firstNoticeContent} />
+            <PlateNoticeEditor
+              readOnly={!canEdit}
+              initialValue={complaint.firstNoticeContent}
+              initialDiscussions={(() => {
+                try {
+                  return complaint.firstNoticeDiscussions ? JSON.parse(complaint.firstNoticeDiscussions) : [];
+                } catch (e) {
+                  console.warn('Failed to parse firstNoticeDiscussions', e);
+                  return [];
+                }
+              })()}
+              user={{ id: user?.id || 'viewer', name: user?.name || user?.role || 'Viewer', email: (user as any)?.email ?? null, role: user?.role }}
+              usersData={usersData}
+              onChange={(json) => {
+                if (!canEdit) return;
+                pendingContentRef.current = json;
+                const discussionsJson = pendingDiscussionsRef.current;
+                const changed =
+                  json !== lastSavedContentRef.current || discussionsJson !== lastSavedDiscussionsRef.current;
+                if (changed) {
+                  scheduleAutoSave(json, discussionsJson);
+                }
+              }}
+              onDiscussionsChange={(discussions) => {
+                if (!canEdit) return;
+                const discussionsJson = JSON.stringify(discussions || []);
+                pendingDiscussionsRef.current = discussionsJson;
+                const contentJson = pendingContentRef.current;
+                const changed =
+                  contentJson !== lastSavedContentRef.current || discussionsJson !== lastSavedDiscussionsRef.current;
+                if (changed) {
+                  scheduleAutoSave(contentJson, discussionsJson);
+                }
+              }}
+            />
           ) : (
             <>
               <p>
@@ -693,7 +777,7 @@ const NoticeOne = ({ complaint, user, onApprovalAction, onRejectionAction }: Not
       `}</style>
 
       {/* Review Comments Section - Only for DCP, ACP, Commissioner */}
-      {user && ['DCP', 'ACP', 'COMMISSIONER'].includes(user.role) && (
+      {['DCP', 'ACP', 'COMMISSIONER'].includes(currentUserRole) && (
         <>
           <Separator className="my-6 print:hidden" />
           <Card className="print:hidden">

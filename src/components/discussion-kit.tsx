@@ -109,7 +109,7 @@ const avatarUrl = (seed: string) =>
 
 const usersData: Record<
   string,
-  { id: string; avatarUrl: string; name: string; hue?: number }
+  { id: string; avatarUrl: string; name: string; hue?: number; email?: string; role?: string }
 > = {
   alice: {
     id: 'alice',
