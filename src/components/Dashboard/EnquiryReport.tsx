@@ -19,6 +19,7 @@ interface EnquiryReportProps {
     fieldVisitDate: Date | null;
     peReport: string | null;
     peDiscussions?: string | null;
+    peStatus?: string | null;
     createdAt: Date;
     // PE Workflow fields
     peDcpComments?: string | null;
@@ -125,11 +126,30 @@ const EnquiryReport = ({ complaint, user, onDcpComment, onNotifyFieldOfficer }: 
   const isDcp = user?.role === 'DCP';
   const isInvestigationOfficer = user?.role === 'INVESTIGATION_OFFICER';
   const canViewComments = ['DCP', 'ACP', 'COMMISSIONER', 'SUPER_ADMIN', 'INVESTIGATION_OFFICER'].includes(user?.role || '');
+  const isDraftMode = complaint.peStatus === 'DRAFT' && ['DCP', 'ACP', 'COMMISSIONER', 'INVESTIGATION_OFFICER'].includes(user?.role || '');
 
   return (
     <div className="space-y-6">
+      {/* Draft Mode Highlighting */}
+      {isDraftMode && (
+        <Card className="border-orange-300 bg-orange-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-orange-100 rounded-full">
+                <MessageSquare className="h-5 w-5 text-orange-700" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-orange-900 mb-1">PE Report in Draft Mode</h3>
+                <p className="text-sm text-orange-800">
+                  This Preliminary Enquiry report is currently in draft mode and has not been submitted for review yet.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {/* Investigation Officer Notification Alert */}
-      {isInvestigationOfficer && complaint.peNotificationSentToFieldOfficer && (
+      {(isInvestigationOfficer || complaint.peNotificationSentToFieldOfficer) && (
         <Card className="border-yellow-300 bg-yellow-50">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">

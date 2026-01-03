@@ -22,6 +22,7 @@ import { generateNotice } from '@/utils/noticeGenerator';
 import { saveAs } from 'file-saver';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
 
 const PlatePEEditor = dynamic(() => import('@/components/PlatePEEditor').then((m) => m.default), { ssr: false });
 const PlateNoticeEditor = dynamic(() => import('@/components/PlateNoticeEditor').then((m) => m.PlateNoticeEditor), { ssr: false });
@@ -231,6 +232,143 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
       if (noticeAutoSaveTimer.current) clearTimeout(noticeAutoSaveTimer.current);
     };
   }, []);
+
+  // Helper functions to determine next action badges for tabs
+  const getPEReportBadge = () => {
+    if (user.role === 'INVESTIGATION_OFFICER') {
+      // New complaint - no PE report generated yet
+      if (!complaint.peReport && !complaint.fieldVisitDate) {
+        return { text: 'Generate', className: 'bg-red-600 hover:bg-red-700 text-white' };
+      }
+      // DCP has approved for creating notice
+      else if (complaint.peNotificationSentToFieldOfficer) {
+        return { text: 'DCP approved for creating notice 1', className: 'bg-green-600 hover:bg-green-700 text-white' };
+      }
+      // PE report completed but not yet approved by DCP
+      else {
+        return { text: 'PE Report Completed', className: 'bg-green-600 hover:bg-green-700 text-white' };
+      }
+    }
+
+    if (user.role === 'DCP') {
+      // PE report not yet generated
+      if (!complaint.peReport) {
+        return { text: 'Not yet Generated', className: 'bg-orange-500 hover:bg-orange-600 text-white' };
+      }
+      // PE report saved in draft mode (not submitted for review)
+      else if (complaint.peStatus === 'DRAFT') {
+        return { text: 'Draft', className: 'bg-gray-500 hover:bg-gray-600 text-white' };
+      }
+      // Investigation officer submitted for review but not yet approved
+      else if (!complaint.peNotificationSentToFieldOfficer && complaint.peStatus === 'SUBMITTED') {
+        return { text: 'Waiting for approval', className: 'bg-blue-600 hover:bg-blue-700 text-white' };
+      }
+      // DCP has approved (notified investigation officer)
+      else if (complaint.peNotificationSentToFieldOfficer) {
+        return { text: 'Investigation Officer Notified', className: 'bg-green-600 hover:bg-green-700 text-white' };
+      }
+      // Default case
+      else {
+        return { text: 'Review PE Report', className: 'bg-orange-500 hover:bg-orange-600 text-white' };
+      }
+    }
+
+    if (['ACP', 'COMMISSIONER'].includes(user.role)) {
+      // DCP has approved (notified investigation officer)
+      if (complaint.peNotificationSentToFieldOfficer) {
+        return { text: 'Investigation Officer Notified', className: 'bg-green-600 hover:bg-green-700 text-white' };
+      }
+      // Waiting for DCP approval
+      else if (!complaint.peNotificationSentToFieldOfficer && complaint.peStatus === 'SUBMITTED') {
+        return { text: 'Waiting for DCP approval', className: 'bg-blue-600 hover:bg-blue-700 text-white' };
+      }
+      // PE report not ready
+      else {
+        return { text: 'PE Report Pending', className: 'bg-orange-500 hover:bg-orange-600 text-white' };
+      }
+    }
+
+    return null;
+  };
+
+  const getNoticeOneBadge = () => {
+    if (user.role === 'INVESTIGATION_OFFICER') {
+      // Check if notice is in draft mode (content exists but not officially issued)
+      if (complaint.firstNoticeContent && (!complaint.firstNoticeNumber || complaint.firstNoticeStatus !== 'ISSUED')) {
+        return { text: 'Draft', className: 'bg-orange-500 hover:bg-orange-600 text-white' };
+      }
+      // No notice generated yet
+      else if (!complaint.firstNoticeNumber) {
+        return { text: 'Generate Notice', className: 'bg-red-600 hover:bg-red-700 text-white' };
+      }
+      // Notice generated and issued
+      else {
+        return { text: 'Notice Generated', className: 'bg-green-600 hover:bg-green-700 text-white' };
+      }
+    }
+    if (['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)) {
+      // Check if notice is in draft mode (content exists but not officially issued)
+      if (complaint.firstNoticeContent && (!complaint.firstNoticeNumber || complaint.firstNoticeStatus !== 'ISSUED')) {
+        return { text: 'Draft', className: 'bg-orange-500 hover:bg-orange-600 text-white' };
+      }
+      // Notice issued but not yet approved
+      else if (complaint.firstNoticeNumber && complaint.firstNoticeStatus === 'ISSUED' && !complaint.notice1CommissionerApprovalDate) {
+        return { text: 'Approve Notice', className: 'bg-blue-600 hover:bg-blue-700 text-white' };
+      }
+      // Notice approved
+      else if (complaint.notice1CommissionerApprovalDate) {
+        return { text: 'Notice Approved', className: 'bg-green-600 hover:bg-green-700 text-white' };
+      }
+      return null;
+    }
+    return null;
+  };
+
+  const getNoticeTwoBadge = () => {
+    if (user.role === 'INVESTIGATION_OFFICER') {
+      // Check if notice is in draft mode (content exists but not officially issued)
+      if (complaint.secondNoticeContent && (!complaint.secondNoticeNumber || complaint.secondNoticeStatus !== 'ISSUED')) {
+        return { text: 'Draft', className: 'bg-orange-500 hover:bg-orange-600 text-white' };
+      }
+      // No notice generated yet
+      else if (!complaint.secondNoticeNumber) {
+        return { text: 'Generate Notice', className: 'bg-red-600 hover:bg-red-700 text-white' };
+      }
+      // Notice generated and issued
+      else {
+        return { text: 'Notice Generated', className: 'bg-green-600 hover:bg-green-700 text-white' };
+      }
+    }
+    if (['DCP', 'ACP', 'COMMISSIONER'].includes(user.role)) {
+      // Check if notice is in draft mode (content exists but not officially issued)
+      if (complaint.secondNoticeContent && (!complaint.secondNoticeNumber || complaint.secondNoticeStatus !== 'ISSUED')) {
+        return { text: 'Draft', className: 'bg-orange-500 hover:bg-orange-600 text-white' };
+      }
+      // Notice issued but not yet approved
+      else if (complaint.secondNoticeNumber && complaint.secondNoticeStatus === 'ISSUED' && !complaint.notice2CommissionerApprovalDate) {
+        return { text: 'Approve Notice', className: 'bg-blue-600 hover:bg-blue-700 text-white' };
+      }
+      // Notice approved
+      else if (complaint.notice2CommissionerApprovalDate) {
+        return { text: 'Notice Approved', className: 'bg-green-600 hover:bg-green-700 text-white' };
+      }
+      return null;
+    }
+    return null;
+  };
+
+  const getSpeakingOrderBadge = () => {
+    // Speaking Order logic - assuming it's for final resolution
+    if (['ACP', 'COMMISSIONER'].includes(user.role)) {
+      if (complaint.finalStatus === 'PENDING' || complaint.finalStatus === 'UNDER_REVIEW_COMMISSIONER') {
+        return { text: 'Issue Order', className: 'bg-blue-600 hover:bg-blue-700 text-white' };
+      } else if (complaint.finalStatus === 'RESOLVED' || complaint.finalStatus === 'CLOSED') {
+        return { text: 'Order Issued', className: 'bg-green-600 hover:bg-green-700 text-white' };
+      }
+      return null;
+    }
+    return null;
+  };
 
   // Build a PE Report HTML that mimics a bordered enquiry report layout.
   const buildPEReportHtml = (c: ComplaintWithRelations) => {
@@ -660,16 +798,52 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
       </div>
 
       <Tabs value={activeTab} defaultValue={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className={`grid w-full ${user.role === 'COMPLAINANT' ? 'grid-cols-1' : 'grid-cols-7'}`}>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsList className={`flex w-full ${user.role === 'COMPLAINANT' ? 'justify-center' : 'justify-between'} p-1 h-auto`}>
+          <TabsTrigger value="overview" className="flex-1 cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors">Overview</TabsTrigger>
           {user.role !== 'COMPLAINANT' && (
             <>
-              <TabsTrigger value="approval-status">Approval Status</TabsTrigger>
-              <TabsTrigger value="fir">FIR Details</TabsTrigger>
-              <TabsTrigger value="comments">Comments</TabsTrigger>
-              <TabsTrigger value="pe-report">PE Report</TabsTrigger>
-              <TabsTrigger value="notice">Notice</TabsTrigger>
-              <TabsTrigger value="speaking-order">Speaking Order</TabsTrigger>
+              <TabsTrigger value="approval-status" className="flex-1 cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors">Approval Status</TabsTrigger>
+              <TabsTrigger value="fir" className="flex-1 cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors">FIR Details</TabsTrigger>
+              <TabsTrigger value="comments" className="flex-1 cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors">Comments</TabsTrigger>
+              <TabsTrigger value="pe-report" className="relative flex flex-col items-center cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors">
+                <span>PE Report</span>
+                {getPEReportBadge() && (
+                  <Badge 
+                    className={`text-xs px-1 py-0 h-4 mt-1 ${getPEReportBadge()!.className}`}
+                  >
+                    {getPEReportBadge()!.text}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="notice" className="relative flex flex-col items-center cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors flex-1">
+                <span>Notice</span>
+                <div className="flex gap-1 mt-1 flex-wrap justify-center">
+                  {getNoticeOneBadge() && (
+                    <Badge 
+                      className={`text-xs px-1 py-0 h-4 ${getNoticeOneBadge()!.className}`}
+                    >
+                      N1: {getNoticeOneBadge()!.text}
+                    </Badge>
+                  )}
+                  {getNoticeTwoBadge() && (
+                    <Badge 
+                      className={`text-xs px-1 py-0 h-4 ${getNoticeTwoBadge()!.className}`}
+                    >
+                      N2: {getNoticeTwoBadge()!.text}
+                    </Badge>
+                  )}
+                </div>
+              </TabsTrigger>
+              <TabsTrigger value="speaking-order" className="relative flex flex-col items-center cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors flex-1">
+                <span>Speaking Order</span>
+                {getSpeakingOrderBadge() && (
+                  <Badge 
+                    className={`text-xs px-1 py-0 h-4 mt-1 ${getSpeakingOrderBadge()!.className}`}
+                  >
+                    {getSpeakingOrderBadge()!.text}
+                  </Badge>
+                )}
+              </TabsTrigger>
             </>
           )}
         </TabsList>
@@ -1695,11 +1869,11 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
                           handleSaveField(`${fieldPrefix}NoticeStatus`, 'ISSUED')
                         ]);
                         
-                        alert('Notice created successfully');
+                        toast.success('Notice created successfully');
                         onUpdate();
                       } catch (e) {
                         console.error('Error creating notice:', e);
-                        alert('Error creating notice');
+                        toast.error('Error creating notice');
                       }
                     }}
                   >

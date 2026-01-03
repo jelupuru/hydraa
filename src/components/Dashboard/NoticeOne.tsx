@@ -28,6 +28,7 @@ interface NoticeOneProps {
     fieldVisitDate: Date | null;
     firstNoticeNumber?: string | null;
     firstNoticeDate?: Date | null;
+    firstNoticeStatus?: string | null;
     firstNoticeContent?: string | null;
     firstNoticeDiscussions?: string | null;
     // Approval workflow fields for Notice 1
@@ -530,10 +531,31 @@ const NoticeOne = ({ complaint, user, usersData, onApprovalAction, onRejectionAc
     }
   };
 
-  const showApprovalFlow = ['DCP', 'ACP', 'COMMISSIONER'].includes(currentUserRole) && (onApprovalAction || onRejectionAction);
+  const showApprovalFlow = ['DCP', 'ACP', 'COMMISSIONER'].includes(currentUserRole) && (onApprovalAction || onRejectionAction) && complaint.firstNoticeNumber && (complaint.firstNoticeStatus || 'NOT_ISSUED') !== 'NOT_ISSUED';
+  const isDraftMode = ['DCP', 'ACP', 'COMMISSIONER', 'INVESTIGATION_OFFICER'].includes(currentUserRole) && 
+                     complaint.firstNoticeContent && 
+                     (!complaint.firstNoticeNumber || complaint.firstNoticeStatus !== 'ISSUED');
 
   return (
     <div className="space-y-6">
+      {/* Draft Mode Highlighting */}
+      {isDraftMode && (
+        <Card className="border-orange-300 bg-orange-50 print:hidden">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-orange-100 rounded-full">
+                <AlertTriangle className="h-5 w-5 text-orange-700" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-orange-900 mb-1">Notice 1 in Draft Mode</h3>
+                <p className="text-sm text-orange-800">
+                  This notice is currently in draft mode and requires approval from DCP → ACP → Commissioner.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {complaint.peNotificationSentToFieldOfficer && (
         <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
           DCP has reviewed the PE report and requested creation of Notice 1.

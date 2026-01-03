@@ -19,6 +19,7 @@ interface Complaint {
   createdAt: Date;
   secondNoticeNumber?: string | null;
   secondNoticeDate?: Date | null;
+  secondNoticeStatus?: string | null;
   // Approval workflow fields for Notice 2
   notice2ApprovalStatus?: string | null;
   notice2DcpApprovalDate?: Date | null;
@@ -267,7 +268,7 @@ const NoticeTwo: React.FC<NoticeProps> = ({ complaint, user, onApprovalAction, o
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       {/* Approval Workflow Section */}
-      {user && user.role && (onApprovalAction || onRejectionAction) && (
+      {user && user.role && (onApprovalAction || onRejectionAction) && complaint.secondNoticeNumber && (complaint.secondNoticeStatus || 'NOT_ISSUED') !== 'NOT_ISSUED' && (
         <>
           <Card>
             <CardHeader>
