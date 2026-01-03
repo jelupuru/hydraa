@@ -164,6 +164,14 @@ CREATE DATABASE hydraa;
 CREATE USER hydraa_user WITH ENCRYPTED PASSWORD 'hydraa_password';
 GRANT ALL PRIVILEGES ON DATABASE hydraa TO hydraa_user;
 ALTER USER hydraa_user CREATEDB;
+
+# Grant schema privileges (required for Prisma migrations)
+GRANT ALL ON SCHEMA public TO hydraa_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO hydraa_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO hydraa_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO hydraa_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO hydraa_user;
+
 \q
 
 # Create database directory for backups
@@ -264,8 +272,14 @@ openssl rand -base64 32
 ### Database Migration
 
 ```bash
-# Run Prisma migrations
+# Option 1: If you have migration files, deploy them
 npx prisma migrate deploy
+
+# Option 2: If no migrations exist, push schema directly to database (recommended for production)
+npx prisma db push
+
+# Verify database connection and schema
+npx prisma db pull
 
 # Seed database (if you have seed script)
 npx prisma db seed
