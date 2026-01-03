@@ -97,9 +97,9 @@ nano .env.production
 Update these values in `.env.production`:
 ```bash
 SECRET=<generate-strong-secret>
-NEXTAUTH_URL=https://yourdomain.com
-NEXT_PUBLIC_SITE_URL=https://yourdomain.com
-SITE_URL=https://yourdomain.com
+NEXTAUTH_URL=https://hydraa.eastasia.cloudapp.azure.com
+NEXT_PUBLIC_SITE_URL=https://hydraa.eastasia.cloudapp.azure.com
+SITE_URL=https://hydraa.eastasia.cloudapp.azure.com
 DATABASE_URL=postgresql://hydraa:hydraa_pass@db:5432/hydraa_db
 NODE_ENV=production
 ```
@@ -153,7 +153,7 @@ sudo systemctl restart nginx
 ### Get SSL certificate:
 ```bash
 # Replace yourdomain.com with your actual domain
-sudo certbot --nginx -d yourdomain.com
+sudo certbot --nginx -d hydraa.eastasia.cloudapp.azure.com
 
 # Test automatic renewal
 sudo certbot renew --dry-run
@@ -277,8 +277,8 @@ crontab -e
 
 1. **Purchase domain** from registrar (Namecheap, GoDaddy, etc.)
 2. **Configure DNS**:
-   - Create A record: `yourdomain.com` → VM Public IP
-   - Create CNAME record: `www.yourdomain.com` → `yourdomain.com`
+   - Create A record: `hydraa.eastasia.cloudapp.azure.com` → VM Public IP
+   - Create CNAME record: `www.hydraa.eastasia.cloudapp.azure.com` → `hydraa.eastasia.cloudapp.azure.com`
 3. **Wait for DNS propagation** (up to 24 hours)
 4. **Run certbot again** once domain is pointing to your VM
 

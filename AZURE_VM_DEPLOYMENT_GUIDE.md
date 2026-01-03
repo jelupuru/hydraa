@@ -236,9 +236,9 @@ NODE_ENV=production
 SECRET=your-super-secure-random-secret-key-here
 
 # URLs
-NEXTAUTH_URL=https://yourdomain.com
-NEXT_PUBLIC_SITE_URL=https://yourdomain.com
-SITE_URL=https://yourdomain.com
+NEXTAUTH_URL=https://hydraa.eastasia.cloudapp.azure.com
+NEXT_PUBLIC_SITE_URL=https://hydraa.eastasia.cloudapp.azure.com
+SITE_URL=https://hydraa.eastasia.cloudapp.azure.com
 
 # Database
 DATABASE_URL=postgresql://hydraa_user:your_strong_password_here@localhost:5432/hydraa
@@ -378,7 +378,7 @@ Add the following configuration (replace `yourdomain.com` with your actual domai
 ```nginx
 server {
     listen 80;
-    server_name yourdomain.com www.yourdomain.com;
+    server_name hydraa.eastasia.cloudapp.azure.com www.hydraa.eastasia.cloudapp.azure.com;
 
     # Redirect HTTP to HTTPS
     return 301 https://$server_name$request_uri;
@@ -386,11 +386,11 @@ server {
 
 server {
     listen 443 ssl http2;
-    server_name yourdomain.com www.yourdomain.com;
+    server_name hydraa.eastasia.cloudapp.azure.com www.hydraa.eastasia.cloudapp.azure.com;
 
     # SSL configuration (certbot will add these)
-    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/hydraa.eastasia.cloudapp.azure.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/hydraa.eastasia.cloudapp.azure.com/privkey.pem;
     
     # SSL security settings
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -513,7 +513,7 @@ sudo systemctl restart nginx
 
 ```bash
 # Replace yourdomain.com with your actual domain
-sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+sudo certbot --nginx -d hydraa.eastasia.cloudapp.azure.com -d www.hydraa.eastasia.cloudapp.azure.com
 
 # Test automatic renewal
 sudo certbot renew --dry-run
@@ -536,8 +536,8 @@ sudo certbot renew --force-renewal
 1. **Purchase Domain**: If you don't have one, purchase from Namecheap, GoDaddy, etc.
 
 2. **Configure DNS**:
-   - **A Record**: `yourdomain.com` → `<VM_PUBLIC_IP>`
-   - **CNAME Record**: `www.yourdomain.com` → `yourdomain.com`
+   - **A Record**: `hydraa.eastasia.cloudapp.azure.com` → `<VM_PUBLIC_IP>`
+   - **CNAME Record**: `www.hydraa.eastasia.cloudapp.azure.com` → `hydraa.eastasia.cloudapp.azure.com`
 
 3. **Wait for Propagation**: DNS changes can take up to 24-48 hours to propagate globally.
 
