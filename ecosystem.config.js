@@ -20,7 +20,7 @@ module.exports = {
         SITE_URL: "https://hydraa.eastasia.cloudapp.azure.com",
         SITE_NAME: "Hydraa",
         AUTHOR_NAME: "Jayakumar",
-        DATABASE_URL: "postgresql://hydraa_user:hydraa_password@localhost:5432/hydraa"
+        DATABASE_URL: "postgresql://hydraa_user:hydraa_password@127.0.0.1:5432/hydraa"
       },
 
       // Process settings
