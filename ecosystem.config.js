@@ -10,10 +10,17 @@ module.exports = {
       // App root
       cwd: "/home/hydraauser/hydraa",
 
-      // Single source of truth for env
+      // Environment variables from .env.production
       env: {
         NODE_ENV: "production",
-        PORT: 3000
+        PORT: 3000,
+        SECRET: "8deadf2493fa2ec5467cd1e756ae7fcb31b0e9ed301aaa4952374d27d9b10f45",
+        NEXTAUTH_URL: "https://hydraa.eastasia.cloudapp.azure.com",
+        NEXT_PUBLIC_SITE_URL: "https://hydraa.eastasia.cloudapp.azure.com",
+        SITE_URL: "https://hydraa.eastasia.cloudapp.azure.com",
+        SITE_NAME: "Hydraa",
+        AUTHOR_NAME: "Jayakumar",
+        DATABASE_URL: "postgresql://hydraa_user:hydraa_password@localhost:5432/hydraa"
       },
 
       // Process settings
