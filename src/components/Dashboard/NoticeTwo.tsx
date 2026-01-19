@@ -351,9 +351,7 @@ const NoticeTwo = ({ complaint, user, usersData, onApprovalAction, onRejectionAc
             <!-- Header -->
             <div class="header">
               <div class="logo-section">
-                <div class="emblem">
-                  HYDRAA
-                </div>
+                <img src="/images/logo/hydraalogo.jpg" alt="Hydraa Logo" style="height: 48px; width: 48px; margin-right: 16px;" />
                 <div class="org-info">
                   <h1 class="org-title">HYDERABAD DISASTER RESPONSE AND ASSETS MONITORING AND PROTECTION AGENCY</h1>
                   <p class="org-subtitle">Government of Telangana</p>
@@ -538,9 +536,7 @@ const NoticeTwo = ({ complaint, user, usersData, onApprovalAction, onRejectionAc
         {/* Header */}
         <div className="header">
           <div className="logo-section">
-            <div className="emblem">
-              HYDRAA
-            </div>
+            <img src="/images/logo/hydraalogo.jpg" alt="Hydraa Logo" className="h-12 w-12 mr-4" />
             <div className="org-info">
               <h1 className="org-title">HYDERABAD DISASTER RESPONSE AND ASSETS MONITORING AND PROTECTION AGENCY</h1>
               <p className="org-subtitle">Government of Telangana</p>

@@ -344,9 +344,7 @@ const NoticeTwo: React.FC<NoticeProps> = ({ complaint, user, onApprovalAction, o
         {/* Header */}
         <div className="header">
           <div className="logo-section">
-            <div className="emblem">
-              HYDRAA
-            </div>
+            <img src="/images/logo/hydraalogo.jpg" alt="Hydraa Logo" className="h-12 w-12 mr-4" />
             <div className="org-info">
               <h1 className="org-title">HYDERABAD DISASTER RESPONSE AND ASSETS MONITORING AND PROTECTION AGENCY</h1>
               <p className="org-subtitle">Government of Telangana</p>

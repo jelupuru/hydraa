@@ -87,10 +87,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <Sidebar className="border-r">
           <SidebarHeader className="border-b px-6 py-4">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <LayoutDashboard className="h-4 w-4" />
-              </div>
-              <span className="font-semibold text-lg">Complaint System</span>
+              <img src="/images/logo/hydraalogo.jpg" alt="Hydraa Logo" className="h-8 w-8" />
+              <span className="font-semibold text-lg">Hydraa</span>
             </div>
           </SidebarHeader>
 

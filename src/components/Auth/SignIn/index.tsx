@@ -54,7 +54,7 @@ const Signin = () => {
         <div className="relative z-20 flex items-center text-lg font-medium">
           <Link href="/" className="flex items-center">
             <Image
-              src="/images/logo/logo-white.svg"
+              src="/images/logo/hydraalogo.jpg"
               alt="logo"
               width={140}
               height={30}
