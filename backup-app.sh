@@ -1,7 +1,7 @@
 #!/bin/bash
 DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="/home/azureuser/backups"
-APP_DIR="/home/azureuser/hydraa"
+BACKUP_DIR="/home/hydraauser/backups"
+APP_DIR="/home/hydraauser/hydraa"
 
 # Create backup directory
 mkdir -p $BACKUP_DIR

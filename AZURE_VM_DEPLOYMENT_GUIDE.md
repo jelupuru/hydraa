@@ -32,7 +32,7 @@ This guide provides step-by-step instructions for deploying your Next.js applica
 
 3. **Configure Administrator Account**:
    - **Authentication type**: SSH public key
-   - **Username**: `azureuser`
+   - **Username**: `hydraauser`
    - **SSH public key source**: Generate new key pair
    - **Key pair name**: `hydraa-vm-key`
 
@@ -76,7 +76,7 @@ az vm create \
   --name hydraa-vm \
   --image Ubuntu2204 \
   --size Standard_B2s \
-  --admin-username azureuser \
+  --admin-username hydraauser \
   --generate-ssh-keys \
   --public-ip-sku Standard \
   --nsg hydraa-nsg
@@ -114,7 +114,7 @@ echo "VM Public IP: $VM_IP"
 chmod 600 ~/Downloads/hydraa-vm-key.pem
 
 # Connect to VM
-ssh -i ~/Downloads/hydraa-vm-key.pem azureuser@<VM_PUBLIC_IP>
+ssh -i ~/Downloads/hydraa-vm-key.pem hydraauser@<VM_PUBLIC_IP>
 ```
 
 ### Update System and Install Dependencies
@@ -312,7 +312,7 @@ module.exports = {
     name: 'hydraa',
     script: 'npm',
     args: 'start',
-    cwd: '/home/azureuser/hydraa',
+    cwd: '/home/hydraauser/hydraa',
     env: {
       NODE_ENV: 'production'
     },
@@ -323,9 +323,9 @@ module.exports = {
     instances: 1,
     exec_mode: 'fork',
     max_memory_restart: '1G',
-    error_file: '/home/azureuser/hydraa/logs/app-error.log',
-    out_file: '/home/azureuser/hydraa/logs/app-out.log',
-    log_file: '/home/azureuser/hydraa/logs/app.log',
+    error_file: '/home/hydraauser/hydraa/logs/app-error.log',
+    out_file: '/home/hydraauser/hydraa/logs/app-out.log',
+    log_file: '/home/hydraauser/hydraa/logs/app.log',
     time: true,
     watch: false,
     autorestart: true,
@@ -352,7 +352,7 @@ pm2 save
 
 # Generate startup script
 pm2 startup
-sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u azureuser --hp /home/azureuser
+sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u hydraauser --hp /home/hydraauser
 
 # Check status
 pm2 status
