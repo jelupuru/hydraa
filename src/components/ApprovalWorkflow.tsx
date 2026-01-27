@@ -3,7 +3,7 @@ import { Check, Clock, X, User } from 'lucide-react';
 import { Button } from './ui/button';
 
 export interface ApprovalWorkflowProps {
-  noticeType: 'notice1' | 'notice2';
+  noticeType: 'notice1' | 'notice2' | 'pe-report';
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   dcpApprovalDate?: Date;
   dcpApprovedBy?: { name: string };
@@ -46,6 +46,9 @@ export default function ApprovalWorkflow({
   const [rejectionReasonInput, setRejectionReasonInput] = React.useState('');
   const [currentStage, setCurrentStage] = React.useState<'dcp' | 'acp' | 'commissioner' | null>(null);
 
+  // For PE report and notices, only DCP and ACP approval is needed
+  const isSimplifiedWorkflow = noticeType === 'notice1' || noticeType === 'notice2' || noticeType === 'pe-report';
+
   const stages: StageStatus[] = [
     {
       label: 'DCP Approval',
@@ -65,13 +68,17 @@ export default function ApprovalWorkflow({
         ? 'rejected'
         : acpApprovalDate 
         ? 'completed'
-        : dcpApprovalDate && !commissionerApprovalDate
+        : dcpApprovalDate && (isSimplifiedWorkflow || !commissionerApprovalDate)
         ? 'current'
         : 'pending',
       approvedBy: acpApprovedBy?.name,
       approvedDate: acpApprovalDate
-    },
-    {
+    }
+  ];
+
+  // Only add Commissioner stage for workflows that require it (not PE report/notices)
+  if (!isSimplifiedWorkflow) {
+    stages.push({
       label: 'Commissioner Approval',
       status: status === 'REJECTED' && rejectionDate && acpApprovalDate
         ? 'rejected'
@@ -82,8 +89,8 @@ export default function ApprovalWorkflow({
         : 'pending',
       approvedBy: commissionerApprovedBy?.name,
       approvedDate: commissionerApprovalDate
-    }
-  ];
+    });
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -150,7 +157,7 @@ export default function ApprovalWorkflow({
     <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
       <div className="flex items-center justify-between mb-8">
         <h3 className="text-xl font-bold text-gray-900">
-          {noticeType === 'notice1' ? 'Notice 1' : 'Notice 2'} Approval Workflow
+          {noticeType === 'notice1' ? 'Notice 1' : noticeType === 'notice2' ? 'Notice 2' : 'PE Report'} Approval Workflow
         </h3>
         <div className={`px-4 py-2 rounded-full text-sm font-semibold ${
           status === 'APPROVED' 

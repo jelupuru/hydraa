@@ -585,15 +585,16 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
             Manage and track complaint progress through the system.
           </p>
         </div>
+        {/* Create New Complaint Button - Visible for Investigation Officers and Complainants */}
         {(user.role === 'INVESTIGATION_OFFICER' || user.role === 'COMPLAINANT') && (
           <Sheet open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <SheetTrigger asChild>
-              <Button>
+              <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-3">
                 <Plus className="mr-2 h-4 w-4" />
-                New Complaint
+                Create New Complaint
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="min-w-[600px] w-[90%] flex flex-col h-full p-4">
+            <SheetContent side="right" className="min-w-[600px] w-[90%] flex flex-col h-full p-4 bg-white">
               <SheetHeader className="shrink-0">
                 <SheetTitle>Create New Complaint</SheetTitle>
                 <SheetDescription>
@@ -804,20 +805,18 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
                 </div>
               </div>
 
-              <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Complaint ID</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>PE Status</TableHead>
-                  <TableHead>Notice 1 Status</TableHead>
-                  <TableHead>Notice 2 Status</TableHead>
-                  <TableHead>Speaking Order Status</TableHead>
-                  <TableHead>Created By</TableHead>
-                  <TableHead>Created Date</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+              <div className="overflow-x-auto">
+                <Table className="w-full table-auto">
+                <TableHeader>
+                  <TableRow className="bg-gray-50/50 border-b border-gray-100">
+                    <TableHead className="font-medium text-gray-700 text-sm py-3 px-4 w-1/6">Complaint Details</TableHead>
+                    <TableHead className="font-medium text-gray-700 text-sm py-3 px-4 w-1/6">PE Status</TableHead>
+                    <TableHead className="font-medium text-gray-700 text-sm py-3 px-4 w-2/6">Notice Status</TableHead>
+                    <TableHead className="font-medium text-gray-700 text-sm py-3 px-4 w-1/6">Speaking Order Status</TableHead>
+                    <TableHead className="font-medium text-gray-700 text-sm py-3 px-4 w-1/6">Created By / Date</TableHead>
+                    <TableHead className="text-right font-medium text-gray-700 text-sm py-3 px-4 w-auto">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {filteredComplaints.map((complaint) => {
                   const isOverdue = isNoticeOverdue(complaint) || isFirstNoticeReplyOverdue(complaint);
@@ -850,170 +849,168 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
                       className={rowClassName}
                       onClick={() => handleViewDetails(complaint)}
                     >
-                      <TableCell className="font-medium text-blue-600">
-                        <div className="flex items-center gap-2">
-                          {complaint.complaintId || complaint.complaintUniqueId || `#${complaint.id}`}
-                          {isOverdue && (
-                            <Badge variant="destructive" className="text-xs animate-pulse">
-                              OVERDUE {daysSinceSent}d
-                            </Badge>
-                          )}
-                          {isPendingNotice1 && (
-                            <Badge variant="default" className="text-xs bg-yellow-600 hover:bg-yellow-700 animate-pulse">
-                              CREATE NOTICE 1
-                            </Badge>
-                          )}
+                      {/* Responsive Complaint ID and Title */}
+                      <TableCell className="font-medium py-3 px-4">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-blue-600 font-medium text-sm truncate max-w-[200px]">
+                              {complaint.complaintId || complaint.complaintUniqueId || `#${complaint.id}`}
+                            </span>
+                            {isOverdue && (
+                              <Badge variant="destructive" className="text-xs animate-pulse px-2 py-0.5 whitespace-nowrap">
+                                OVERDUE {daysSinceSent}d
+                              </Badge>
+                            )}
+                            {isPendingNotice1 && (
+                              <Badge variant="default" className="text-xs bg-yellow-600 hover:bg-yellow-700 animate-pulse px-2 py-0.5 whitespace-nowrap">
+                                CREATE NOTICE 1
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-600 font-normal line-clamp-2">
+                            {complaint.natureOfComplaint || 'Untitled Complaint'}
+                          </div>
                         </div>
                       </TableCell>
-                    <TableCell className="font-medium">{complaint.natureOfComplaint || 'Untitled Complaint'}</TableCell>
                     
-                    {/* Enhanced PE Status with details */}
-                    <TableCell className="min-w-[200px]">
+                    {/* Responsive PE Status */}
+                    <TableCell className="py-3 px-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           {(() => {
                             const peStatus = resolvePEStatus(complaint);
                             if (peStatus === 'NOTICE_REQUESTED') {
-                              return <Badge variant="default" className="text-xs bg-orange-600 hover:bg-orange-700">DCP → Create Notice 1</Badge>;
+                              return <Badge variant="default" className="text-xs bg-orange-600 hover:bg-orange-700 px-2 py-0.5 whitespace-nowrap">DCP → Create Notice 1</Badge>;
                             }
                             if (peStatus === 'COMPLETED') {
-                              return <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">✓ PE Completed</Badge>;
+                              return <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700 px-2 py-0.5 whitespace-nowrap">✓ PE Completed</Badge>;
                             }
                             if (peStatus === 'SUBMITTED') {
-                              return <Badge variant="default" className="text-xs bg-blue-600 hover:bg-blue-700">Submitted for Review</Badge>;
+                              return <Badge variant="default" className="text-xs bg-blue-600 hover:bg-blue-700 px-2 py-0.5 whitespace-nowrap">Submitted for Review</Badge>;
                             }
                             if (peStatus === 'REVIEWED') {
-                              return <Badge variant="default" className="text-xs bg-purple-600 hover:bg-purple-700">Under Review</Badge>;
+                              return <Badge variant="default" className="text-xs bg-purple-600 hover:bg-purple-700 px-2 py-0.5 whitespace-nowrap">Under Review</Badge>;
                             }
                             if (peStatus === 'DRAFT') {
-                              return <Badge variant="secondary" className="text-xs">Draft</Badge>;
+                              return <Badge variant="secondary" className="text-xs px-2 py-0.5 whitespace-nowrap">Draft</Badge>;
                             }
                             if (peStatus === 'NOT_STARTED' && complaint.fieldVisitDate) {
-                              return <Badge variant="outline" className="text-xs bg-yellow-50">Field Visit Done</Badge>;
+                              return <Badge variant="outline" className="text-xs bg-yellow-50 px-2 py-0.5 whitespace-nowrap">Field Visit Done</Badge>;
                             }
-                            return <Badge variant="outline" className="text-xs">Not Started</Badge>;
+                            return <Badge variant="outline" className="text-xs px-2 py-0.5 whitespace-nowrap">Not Started</Badge>;
                           })()}
                         </div>
                         {complaint.fieldVisitDate && (
-                          <div className="text-xs text-gray-600">
+                          <div className="text-xs text-gray-500 truncate">
                             Visit: {new Date(complaint.fieldVisitDate).toLocaleDateString()}
                           </div>
                         )}
                       </div>
                     </TableCell>
                     
-                    {/* Enhanced Notice 1 Status with details */}
-                    <TableCell className="min-w-[250px]">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          {!complaint.firstNoticeNumber && !complaint.firstNoticeDate ? (
-                            <Badge variant="outline" className="text-xs">
-                              Not Generated
-                            </Badge>
-                          ) : complaint.notice1RejectionDate ? (
-                            <Badge variant="destructive" className="text-xs">
-                              ✗ Rejected
-                            </Badge>
-                          ) : complaint.notice1CommissionerApprovalDate ? (
-                            <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">
-                              ✓ Fully Approved
-                            </Badge>
-                          ) : complaint.notice1AcpApprovalDate ? (
-                            <Badge variant="default" className="text-xs bg-blue-600 hover:bg-blue-700">
-                              Commissioner Pending
-                            </Badge>
-                          ) : complaint.notice1DcpApprovalDate ? (
-                            <Badge variant="default" className="text-xs bg-yellow-600 hover:bg-yellow-700">
-                              ACP Pending
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              DCP Pending
-                            </Badge>
+                    {/* Responsive Notice Status - Notice 1 & Notice 2 */}
+                    <TableCell className="py-3 px-4">
+                      <div className="space-y-2 max-w-full">
+                        {/* Notice 1 */}
+                        <div className="bg-blue-50/50 p-2 rounded border border-blue-100">
+                          <div className="flex items-center justify-between mb-1 gap-2">
+                            <span className="text-xs font-medium text-blue-800 whitespace-nowrap">Notice 1</span>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {!complaint.firstNoticeNumber && !complaint.firstNoticeDate ? (
+                                <Badge variant="outline" className="text-xs px-2 py-0.5 whitespace-nowrap">
+                                  Not Generated
+                                </Badge>
+                              ) : complaint.notice1RejectionDate ? (
+                                <Badge variant="destructive" className="text-xs px-2 py-0.5 whitespace-nowrap">
+                                  ✗ Rejected
+                                </Badge>
+                              ) : complaint.notice1CommissionerApprovalDate ? (
+                                <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700 px-2 py-0.5 whitespace-nowrap">
+                                  ✓ Fully Approved
+                                </Badge>
+                              ) : complaint.notice1AcpApprovalDate ? (
+                                <Badge variant="default" className="text-xs bg-blue-600 hover:bg-blue-700 px-2 py-0.5 whitespace-nowrap">
+                                  Commissioner Pending
+                                </Badge>
+                              ) : complaint.notice1DcpApprovalDate ? (
+                                <Badge variant="default" className="text-xs bg-yellow-600 hover:bg-yellow-700 px-2 py-0.5 whitespace-nowrap">
+                                  ACP Pending
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs px-2 py-0.5 whitespace-nowrap">
+                                  DCP Pending
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          {complaint.firstNoticeDate && (
+                            <div className="text-xs text-blue-700 truncate">
+                              Generated: {new Date(complaint.firstNoticeDate).toLocaleDateString()}
+                            </div>
                           )}
                         </div>
-                        {complaint.firstNoticeDate && (
-                          <div className="text-xs text-gray-600">
-                            Generated: {new Date(complaint.firstNoticeDate).toLocaleDateString()}
+
+                        {/* Notice 2 */}
+                        <div className="bg-purple-50/50 p-2 rounded border border-purple-100">
+                          <div className="flex items-center justify-between mb-1 gap-2">
+                            <span className="text-xs font-medium text-purple-800 whitespace-nowrap">Notice 2</span>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {!complaint.secondNoticeNumber && !complaint.secondNoticeDate ? (
+                                <Badge variant="outline" className="text-xs px-2 py-0.5 whitespace-nowrap">
+                                  Not Generated
+                                </Badge>
+                              ) : complaint.notice2RejectionDate ? (
+                                <Badge variant="destructive" className="text-xs px-2 py-0.5 whitespace-nowrap">
+                                  ✗ Rejected
+                                </Badge>
+                              ) : complaint.notice2CommissionerApprovalDate ? (
+                                <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700 px-2 py-0.5 whitespace-nowrap">
+                                  ✓ Fully Approved
+                                </Badge>
+                              ) : complaint.notice2AcpApprovalDate ? (
+                                <Badge variant="default" className="text-xs bg-blue-600 hover:bg-blue-700 px-2 py-0.5 whitespace-nowrap">
+                                  Commissioner Pending
+                                </Badge>
+                              ) : complaint.notice2DcpApprovalDate ? (
+                                <Badge variant="default" className="text-xs bg-yellow-600 hover:bg-yellow-700 px-2 py-0.5 whitespace-nowrap">
+                                  ACP Pending
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs px-2 py-0.5 whitespace-nowrap">
+                                  DCP Pending
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-                        )}
-                        {complaint.notice1CommissionerApprovalDate && complaint.notice1CommissionerApprovedBy && (
-                          <div className="text-xs text-gray-600">
-                            Approved by: {complaint.notice1CommissionerApprovedBy.name}<br/>
-                            Date: {new Date(complaint.notice1CommissionerApprovalDate).toLocaleDateString()}
-                          </div>
-                        )}
+                          {complaint.secondNoticeDate && (
+                            <div className="text-xs text-purple-700 truncate">
+                              Generated: {new Date(complaint.secondNoticeDate).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     
-                    {/* Enhanced Notice 2 Status with details */}
-                    <TableCell className="min-w-[250px]">
+                    {/* Responsive Speaking Order Status */}
+                    <TableCell className="py-3 px-4">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          {!complaint.secondNoticeNumber && !complaint.secondNoticeDate ? (
-                            <Badge variant="outline" className="text-xs">
-                              Not Generated
-                            </Badge>
-                          ) : complaint.notice2RejectionDate ? (
-                            <Badge variant="destructive" className="text-xs">
-                              ✗ Rejected
-                            </Badge>
-                          ) : complaint.notice2CommissionerApprovalDate ? (
-                            <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">
-                              ✓ Fully Approved
-                            </Badge>
-                          ) : complaint.notice2AcpApprovalDate ? (
-                            <Badge variant="default" className="text-xs bg-blue-600 hover:bg-blue-700">
-                              Commissioner Pending
-                            </Badge>
-                          ) : complaint.notice2DcpApprovalDate ? (
-                            <Badge variant="default" className="text-xs bg-yellow-600 hover:bg-yellow-700">
-                              ACP Pending
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              DCP Pending
-                            </Badge>
-                          )}
-                        </div>
-                        {complaint.secondNoticeDate && (
-                          <div className="text-xs text-gray-600">
-                            Generated: {new Date(complaint.secondNoticeDate).toLocaleDateString()}
-                          </div>
-                        )}
-                        {complaint.notice2CommissionerApprovalDate && complaint.notice2CommissionerApprovedBy && (
-                          <div className="text-xs text-gray-600">
-                            Approved by: {complaint.notice2CommissionerApprovedBy.name}<br/>
-                            Date: {new Date(complaint.notice2CommissionerApprovalDate).toLocaleDateString()}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    
-                    {/* Speaking Order Status (placeholder for now) */}
-                    <TableCell className="min-w-[200px]">
-                      <div className="space-y-1">
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs px-2 py-0.5 whitespace-nowrap">
                           Not Generated
                         </Badge>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 truncate">
                           Speaking Order functionality pending
                         </div>
                       </div>
                     </TableCell>
                     
-                    {/* Created By */}
-                    <TableCell>
-                      <div className="text-sm">
-                        <div className="font-medium">{complaint.createdBy.name}</div>
-                        <div className="text-xs text-gray-500">{complaint.createdBy.role}</div>
-                      </div>
-                    </TableCell>
-                    
-                    {/* Created Date */}
-                    <TableCell>
-                      <div className="text-sm">
-                        {new Date(complaint.createdAt).toLocaleDateString()}
+                    {/* Responsive Created By / Date */}
+                    <TableCell className="py-3 px-4">
+                      <div className="text-sm space-y-1 max-w-full">
+                        <div className="font-medium text-gray-800 truncate">{complaint.createdBy.name}</div>
+                        <div className="text-xs text-gray-500 truncate">{complaint.createdBy.role}</div>
+                        <div className="text-xs text-gray-600 whitespace-nowrap">
+                          {new Date(complaint.createdAt).toLocaleDateString()}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()} className="text-right">
@@ -1039,6 +1036,7 @@ export default function ComplaintsManagement({ user }: ComplaintsManagementProps
                 })}
               </TableBody>
             </Table>
+            </div>
             </>
           )}
         </CardContent>

@@ -106,7 +106,10 @@ export default function ComplaintPage() {
           <h1 className="text-3xl font-bold">Complaint Details</h1>
           <p className="text-muted-foreground">Full details of the complaint</p>
         </div>
-        <Button variant="outline" onClick={() => router.back()}>
+        <Button 
+          className="btn-primary hover:shadow-lg transition-all duration-200 font-medium" 
+          onClick={() => router.back()}
+        >
           Back to Complaints
         </Button>
       </div>

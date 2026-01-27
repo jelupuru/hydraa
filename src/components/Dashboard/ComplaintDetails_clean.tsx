@@ -759,113 +759,116 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
   return (
     <div className="space-y-6 h-full overflow-y-auto">
       {/* Enhanced Header with Status Cards */}
-      <div className="bg-white rounded-lg p-1">
-        <div className="mb-4">
-          {/* Complaint ID and Creation Info */}
-          <div className="bg-white rounded-lg p-2 mb-1">
-            <div className="flex items-center justify-between mb-1">
-              <h1 className="text-2xl font-bold text-gray-900">
-                {complaint.complaintId || `CMP-${complaint.id}`}
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 rounded-xl p-6 shadow-sm">
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                Complaint Details
               </h1>
-              <div className="flex items-center gap-3">
-                <Badge 
-                  variant={getStatusBadgeVariant(complaint.finalStatus)} 
-                  className="text-sm px-3 py-1 font-semibold"
-                >
-                  {complaint.finalStatus?.replace('_', ' ') || 'PENDING'}
-                </Badge>
-              </div>
+              <Badge 
+                variant={getStatusBadgeVariant(complaint.finalStatus)} 
+                className="text-sm px-3 py-1 font-semibold"
+              >
+                {complaint.finalStatus?.replace('_', ' ') || 'PENDING'}
+              </Badge>
             </div>
-            <p className="text-gray-600 mb-1">
-              Created by {complaint.createdBy.name} on {new Date(complaint.createdAt).toLocaleDateString()}
-            </p>
+            <p className="text-gray-600 mb-4">Full details of the complaint</p>
+            
+            {/* Complaint ID and Creation Info */}
+            <div className="bg-white rounded-lg p-4 border border-gray-200 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xl font-bold text-gray-900">
+                  {complaint.complaintId || `CMP-${complaint.id}`}
+                </h2>
+                <span className="text-sm text-gray-500">
+                  Created by {complaint.createdBy.name} on {new Date(complaint.createdAt).toLocaleDateString()}
+                </span>
+              </div>
               
-              {/* Enhanced Badge Style Status Tags */}
-              <div className="flex flex-wrap items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                {/* Priority - Made more prominent */}
-                <Badge variant={
-                  complaint.complaintPriority === 'HIGH' || complaint.complaintPriority === 'URGENT' 
-                    ? 'destructive' : complaint.complaintPriority === 'MEDIUM' ? 'default' : 'secondary'
-                } className="text-sm font-medium px-3 py-1">
-                  Priority: {complaint.complaintPriority || 'NORMAL'}
-                </Badge>
-                
-                {/* Source */}
-                <Badge variant="outline" className="text-sm px-3 py-1">
-                  Source: {complaint.sourceOfComplaint || 'N/A'}
-                </Badge>
-
-                {/* Mode of Complaint */}
-                {complaint.modeOfComplaint && (
-                  <Badge variant="secondary" className="text-sm px-3 py-1">
-                    Mode: {complaint.modeOfComplaint}
-                  </Badge>
-                )}
-
-                {/* Category */}
-                {complaint.natureOfComplaint && (
-                  <Badge variant="outline" className="text-sm px-3 py-1">
-                    Category: {complaint.natureOfComplaint.length > 20 ? `${complaint.natureOfComplaint.substring(0, 20)}...` : complaint.natureOfComplaint}
-                  </Badge>
-                )}
-
-                {/* Date Received */}
-                {complaint.dateOfApplicationReceived && (
-                  <Badge variant="secondary" className="text-sm px-3 py-1">
-                    Received: {new Date(complaint.dateOfApplicationReceived).toLocaleDateString()}
-                  </Badge>
-                )}
-                
+              {/* Quick Status Overview Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Notice 1 Status */}
                 {(complaint.firstNoticeNumber || complaint.firstNoticeDate) && (
-                  <>
-                    <Badge variant="outline" className="text-sm px-3 py-1">
-                      Notice 1: {complaint.notice1ApprovalStatus || 'PENDING'}
-                    </Badge>
-                    {complaint.firstNoticeDate && (
-                      <Badge variant="secondary" className="text-sm px-3 py-1">
-                        N1 Date: {new Date(complaint.firstNoticeDate).toLocaleDateString()}
-                      </Badge>
-                    )}
-                  </>
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium text-blue-700 mb-1">Notice 1</p>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={
+                            complaint.notice1ApprovalStatus === 'APPROVED' ? 'default' :
+                            complaint.notice1ApprovalStatus === 'REJECTED' ? 'destructive' : 'secondary'
+                          } className="text-xs">
+                            {complaint.notice1ApprovalStatus || 'PENDING'}
+                          </Badge>
+                          {complaint.firstNoticeDate && (
+                            <span className="text-xs text-gray-600">
+                              {new Date(complaint.firstNoticeDate).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <FileText className="h-4 w-4 text-blue-600" />
+                    </div>
+                  </div>
                 )}
                 
                 {/* Notice 2 Status */}
                 {(complaint.secondNoticeNumber || complaint.secondNoticeDate) && (
-                  <>
-                    <Badge variant="outline" className="text-sm px-3 py-1">
-                      Notice 2: {complaint.notice2ApprovalStatus || 'PENDING'}
-                    </Badge>
-                    {complaint.secondNoticeDate && (
-                      <Badge variant="secondary" className="text-sm px-3 py-1">
-                        N2 Date: {new Date(complaint.secondNoticeDate).toLocaleDateString()}
-                      </Badge>
-                    )}
-                  </>
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border border-purple-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium text-purple-700 mb-1">Notice 2</p>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={
+                            complaint.notice2ApprovalStatus === 'APPROVED' ? 'default' :
+                            complaint.notice2ApprovalStatus === 'REJECTED' ? 'destructive' : 'secondary'
+                          } className="text-xs">
+                            {complaint.notice2ApprovalStatus || 'PENDING'}
+                          </Badge>
+                          {complaint.secondNoticeDate && (
+                            <span className="text-xs text-gray-600">
+                              {new Date(complaint.secondNoticeDate).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <FileText className="h-4 w-4 text-purple-600" />
+                    </div>
+                  </div>
                 )}
-
-                {/* FIR Status */}
-                {complaint.firRegistered === 'YES' && complaint.firNumber && (
-                  <Badge variant="destructive" className="text-sm px-3 py-1">
-                    FIR: {complaint.firNumber}
-                  </Badge>
-                )}
-
-                {/* Assigned To */}
-                {complaint.assignedTo && (
-                  <Badge variant="default" className="text-sm px-3 py-1">
-                    Assigned: {complaint.assignedTo.name}
-                  </Badge>
-                )}
-
-                {/* Location */}
-                {complaint.placeOfComplaint && (
-                  <Badge variant="outline" className="text-sm px-3 py-1">
-                    Location: {complaint.placeOfComplaint}
-                  </Badge>
-                )}
+                
+                {/* Priority & Source */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-green-700 mb-1">Priority & Source</p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={
+                          complaint.complaintPriority === 'HIGH' || complaint.complaintPriority === 'URGENT' 
+                            ? 'destructive' : 'secondary'
+                        } className="text-xs">
+                          {complaint.complaintPriority || 'NORMAL'}
+                        </Badge>
+                        <span className="text-xs text-gray-600">
+                          {complaint.sourceOfComplaint || 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+                    <AlertTriangle className="h-4 w-4 text-green-600" />
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
+          
+          <Button 
+            onClick={() => router.push('/dashboard/complaints')}
+            variant="outline"
+            className="ml-4 bg-white hover:bg-gray-50 border-gray-300"
+          >
+            ← Back to Complaints
+          </Button>
         </div>
       </div>
 
@@ -1202,22 +1205,27 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
         <TabsContent value="fir" className="w-full max-w-full space-y-6 mt-6">
           <FIRManagement 
             complaintId={complaint.id}
-            firs={(complaint.firs || []) as any[]}
-            canCreateFIR={user.role === 'INVESTIGATION_OFFICER' || user.role === 'DCP' || user.role === 'ACP' || user.role === 'COMMISSIONER'}
-            onFIRCreated={onUpdate}
-            onFIREdited={onUpdate}
-            onFIRDeleted={onUpdate}
+            firs={(complaint.firs || []).map(fir => ({
+              ...fir,
+              status: fir.status as any,
+              createdBy: fir.createdBy || { name: 'Unknown' },
+              updatedBy: fir.updatedBy || undefined
+            }))}
+            canCreateFIR={user.role === 'SUPER_ADMIN' || user.role === 'INVESTIGATION_OFFICER'}
+            onFIRCreated={() => {}}
+            onFIREdited={() => {}}
+            onFIRDeleted={() => {}}
           />
         </TabsContent>
 
         <TabsContent value="comments" className="w-full max-w-full space-y-6 mt-6">
           <CommentManagement 
             complaintId={complaint.id}
-            comments={(complaint.comments || []) as any[]}
-            canAddComments={user.role !== 'COMPLAINANT' || user.id === complaint.createdBy.id}
-            onCommentCreated={onUpdate}
-            onCommentEdited={onUpdate}
-            onCommentDeleted={onUpdate}
+            comments={complaint.comments || []}
+            canAddComments={true}
+            onCommentCreated={() => {}}
+            onCommentEdited={() => {}}
+            onCommentDeleted={() => {}}
           />
         </TabsContent>
 
@@ -1226,21 +1234,19 @@ export default function ComplaintDetails({ complaint, user, onUpdate }: Complain
             <NoticeApproval 
               complaint={complaint} 
               userRole={user.role}
-              onApprovalUpdate={onUpdate}
+              onApprovalUpdate={() => {}}
             />
             <ApprovalWorkflow 
               noticeType="notice1"
-              status={complaint.notice1ApprovalStatus as any || 'PENDING'}
+              status="PENDING"
               dcpApprovalDate={complaint.notice1DcpApprovalDate || undefined}
-              dcpApprovedBy={complaint.notice1DcpApprovedBy || undefined}
               acpApprovalDate={complaint.notice1AcpApprovalDate || undefined}
-              acpApprovedBy={complaint.notice1AcpApprovedBy || undefined}
               commissionerApprovalDate={complaint.notice1CommissionerApprovalDate || undefined}
-              commissionerApprovedBy={complaint.notice1CommissionerApprovedBy || undefined}
               rejectionDate={complaint.notice1RejectionDate || undefined}
-              rejectedBy={complaint.notice1RejectedBy || undefined}
               rejectionReason={complaint.notice1RejectionReason || undefined}
               userRole={user.role}
+              onApprove={() => {}}
+              onReject={() => {}}
             />
           </div>
         </TabsContent>

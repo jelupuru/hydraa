@@ -56,19 +56,22 @@ async function handleApprovalAction({
     updateData[`${noticePrefix}${stage.charAt(0).toUpperCase() + stage.slice(1)}ApprovedById`] = userId;
     updateData[`${noticePrefix}${stage.charAt(0).toUpperCase() + stage.slice(1)}ApprovalDate`] = new Date();
 
+    // For PE report and notices, approval is complete after ACP approval (no commissioner needed)
+    const isSimplifiedWorkflow = true; // Always simplified for notices
+    
     // Check if this completes the approval process
     const isFullyApproved = 
       (stage === 'dcp' && 
-        complaint[`${noticePrefix}AcpApprovalDate` as keyof typeof complaint] && 
-        complaint[`${noticePrefix}CommissionerApprovalDate` as keyof typeof complaint]) ||
+        complaint[`${noticePrefix}AcpApprovalDate` as keyof typeof complaint]) ||
       (stage === 'acp' && 
-        complaint[`${noticePrefix}DcpApprovalDate` as keyof typeof complaint] && 
-        complaint[`${noticePrefix}CommissionerApprovalDate` as keyof typeof complaint]) ||
-      (stage === 'commissioner' && 
+        complaint[`${noticePrefix}DcpApprovalDate` as keyof typeof complaint]) ||
+      // For non-simplified workflows, keep old logic (speaking orders, etc.)
+      (!isSimplifiedWorkflow && stage === 'commissioner' && 
         complaint[`${noticePrefix}DcpApprovalDate` as keyof typeof complaint] && 
         complaint[`${noticePrefix}AcpApprovalDate` as keyof typeof complaint]);
 
-    if (isFullyApproved || stage === 'commissioner') {
+    // For notices, mark as approved after ACP approval
+    if (isFullyApproved || stage === 'acp') {
       updateData[`${noticePrefix}ApprovalStatus`] = 'APPROVED';
     }
 

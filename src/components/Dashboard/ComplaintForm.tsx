@@ -8,7 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { RefreshCw, MapPin, FileText, User as UserIcon, AlertTriangle, Phone, Calendar, Building, Briefcase } from 'lucide-react';
 
 interface ComplaintFormProps {
   user: User;
@@ -89,7 +91,6 @@ export default function ComplaintForm({ user, complaint, onSuccess, onCancel, re
       });
     } catch (error) {
       console.error('Error fetching jurisdiction data:', error);
-      // Fallback to empty data if API fails
       setJurisdictionData({
         commissionerates: [],
         dcpZones: [],
@@ -169,8 +170,6 @@ export default function ComplaintForm({ user, complaint, onSuccess, onCancel, re
       const method = complaint ? 'PATCH' : 'POST';
       const url = complaint ? `/api/complaints/${complaint.id}` : '/api/complaints';
 
-      // For new complaints we support attachments via FormData.
-      // For edits, keep JSON body for now (no attachment editing implemented).
       if (!complaint && attachments.length > 0) {
         const form = new FormData();
         Object.entries(formData).forEach(([key, value]) => {
@@ -236,290 +235,429 @@ export default function ComplaintForm({ user, complaint, onSuccess, onCancel, re
   );
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Jurisdiction Selection */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Jurisdiction</CardTitle>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fetchJurisdictionData()}
-              disabled={jurisdictionLoading}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${jurisdictionLoading ? 'animate-spin' : ''}`} />
-              {jurisdictionLoading ? 'Refreshing...' : 'Refresh Data'}
-            </Button>
+    <div className="h-full bg-gradient-to-br from-gray-50 to-white p-1">
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl mx-auto">
+        {/* Progress Indicator */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex space-x-4">
+            <Badge variant="secondary" className="px-3 py-1">
+              <Building className="h-3 w-3 mr-1" />
+              Step 1: Jurisdiction
+            </Badge>
+            <Badge variant="secondary" className="px-3 py-1">
+              <FileText className="h-3 w-3 mr-1" />
+              Step 2: Details
+            </Badge>
+            <Badge variant="secondary" className="px-3 py-1">
+              <UserIcon className="h-3 w-3 mr-1" />
+              Step 3: Contact
+            </Badge>
           </div>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="commissionerate">Commissionerate *</Label>
-            <Select value={formData.commissionerateId} onValueChange={(value) => handleInputChange('commissionerateId', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select Commissionerate" />
-              </SelectTrigger>
-              <SelectContent>
-                {jurisdictionData.commissionerates.map((comm) => (
-                  <SelectItem key={comm.id} value={comm.id.toString()}>
-                    {comm.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="dcpZone">DCP Zone *</Label>
-            <Select
-              value={formData.dcpZoneId}
-              onValueChange={(value) => handleInputChange('dcpZoneId', value)}
-              disabled={!formData.commissionerateId}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select DCP Zone" />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredDCPZones.map((zone) => (
-                  <SelectItem key={zone.id} value={zone.id.toString()}>
-                    {zone.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="municipalZone">Municipal Zone</Label>
-            <Select
-              value={formData.municipalZoneId}
-              onValueChange={(value) => handleInputChange('municipalZoneId', value)}
-              disabled={!formData.dcpZoneId}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select Municipal Zone" />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredMunicipalZones.map((zone) => (
-                  <SelectItem key={zone.id} value={zone.id.toString()}>
-                    {zone.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="acpDivision">ACP Division</Label>
-            <Select
-              value={formData.acpDivisionId}
-              onValueChange={(value) => handleInputChange('acpDivisionId', value)}
-              disabled={!formData.municipalZoneId}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select ACP Division" />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredACPDivisions.map((division) => (
-                  <SelectItem key={division.id} value={division.id.toString()}>
-                    {division.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Complaint Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Complaint Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="natureOfComplaint">Nature of Complaint *</Label>
-              <Select value={formData.natureOfComplaint} onValueChange={(value) => handleInputChange('natureOfComplaint', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select nature of complaint" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Lake Encroachment">Lake Encroachment</SelectItem>
-                  <SelectItem value="Dumping in Lake">Dumping in Lake</SelectItem>
-                  <SelectItem value="Illegal Constructions in Lake">Illegal Constructions in Lake</SelectItem>
-                  <SelectItem value="Park Encroachment">Park Encroachment</SelectItem>
-                  <SelectItem value="Road/Footpath Encroachment">Road/Footpath Encroachment</SelectItem>
-                  <SelectItem value="Nala Encroachment">Nala Encroachment</SelectItem>
-                  <SelectItem value="Govt. Land Encroachment">Govt. Land Encroachment</SelectItem>
-                  <SelectItem value="Others">Others</SelectItem>
-                </SelectContent>
-              </Select>
+        {/* Jurisdiction Selection */}
+        <Card className="border bg-white">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-lg border-b py-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 bg-blue-100 rounded-lg">
+                  <Building className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-base font-medium text-gray-800">Jurisdiction Selection</CardTitle>
+                  <p className="text-xs text-gray-600">Choose the administrative area for this complaint</p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fetchJurisdictionData()}
+                disabled={jurisdictionLoading}
+                className="bg-white hover:bg-gray-50 border-gray-300"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${jurisdictionLoading ? 'animate-spin' : ''}`} />
+                {jurisdictionLoading ? 'Refreshing...' : 'Refresh Data'}
+              </Button>
             </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="commissionerate" className="text-sm font-semibold text-gray-700 flex items-center">
+                  <Building className="h-4 w-4 mr-2 text-blue-500" />
+                  Commissionerate
+                  <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <Select value={formData.commissionerateId} onValueChange={(value) => handleInputChange('commissionerateId', value)}>
+                  <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    <SelectValue placeholder="Select Commissionerate" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jurisdictionData.commissionerates.map((comm) => (
+                      <SelectItem key={comm.id} value={comm.id.toString()}>
+                        {comm.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="complaintPriority">Priority</Label>
-              <Select value={formData.complaintPriority} onValueChange={(value) => handleInputChange('complaintPriority', value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="LOW">Low</SelectItem>
-                  <SelectItem value="NORMAL">Normal</SelectItem>
-                  <SelectItem value="HIGH">High</SelectItem>
-                  <SelectItem value="URGENT">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <Label htmlFor="dcpZone" className="text-sm font-semibold text-gray-700 flex items-center">
+                  <Briefcase className="h-4 w-4 mr-2 text-green-500" />
+                  DCP Zone
+                  <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <Select
+                  value={formData.dcpZoneId}
+                  onValueChange={(value) => handleInputChange('dcpZoneId', value)}
+                  disabled={!formData.commissionerateId}
+                >
+                  <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-50">
+                    <SelectValue placeholder="Select DCP Zone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredDCPZones.map((zone) => (
+                      <SelectItem key={zone.id} value={zone.id.toString()}>
+                        {zone.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="municipalZone" className="text-sm font-semibold text-gray-700 flex items-center">
+                  <Building className="h-4 w-4 mr-2 text-purple-500" />
+                  Municipal Zone
+                </Label>
+                <Select
+                  value={formData.municipalZoneId}
+                  onValueChange={(value) => handleInputChange('municipalZoneId', value)}
+                  disabled={!formData.dcpZoneId}
+                >
+                  <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-50">
+                    <SelectValue placeholder="Select Municipal Zone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredMunicipalZones.map((zone) => (
+                      <SelectItem key={zone.id} value={zone.id.toString()}>
+                        {zone.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="acpDivision" className="text-sm font-semibold text-gray-700 flex items-center">
+                  <Briefcase className="h-4 w-4 mr-2 text-indigo-500" />
+                  ACP Division
+                </Label>
+                <Select
+                  value={formData.acpDivisionId}
+                  onValueChange={(value) => handleInputChange('acpDivisionId', value)}
+                  disabled={!formData.municipalZoneId}
+                >
+                  <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-50">
+                    <SelectValue placeholder="Select ACP Division" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredACPDivisions.map((division) => (
+                      <SelectItem key={division.id} value={division.id.toString()}>
+                        {division.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Complaint Details */}
+        <Card className="border bg-white">
+          <CardHeader className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-t-lg border-b py-2">
+            <div className="flex items-center space-x-2">
+              <div className="p-1.5 bg-orange-100 rounded-lg">
+                <FileText className="h-4 w-4 text-orange-600" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-medium text-gray-800">Complaint Details</CardTitle>
+                <p className="text-xs text-gray-600">Provide detailed information about the complaint</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="natureOfComplaint" className="text-sm font-semibold text-gray-700 flex items-center">
+                    <AlertTriangle className="h-4 w-4 mr-2 text-red-500" />
+                    Nature of Complaint
+                    <span className="text-red-500 ml-1">*</span>
+                  </Label>
+                  <Select value={formData.natureOfComplaint} onValueChange={(value) => handleInputChange('natureOfComplaint', value)}>
+                    <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                      <SelectValue placeholder="Select nature of complaint" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Lake Encroachment">Lake Encroachment</SelectItem>
+                      <SelectItem value="Dumping in Lake">Dumping in Lake</SelectItem>
+                      <SelectItem value="Illegal Constructions in Lake">Illegal Constructions in Lake</SelectItem>
+                      <SelectItem value="Park Encroachment">Park Encroachment</SelectItem>
+                      <SelectItem value="Road/Footpath Encroachment">Road/Footpath Encroachment</SelectItem>
+                      <SelectItem value="Nala Encroachment">Nala Encroachment</SelectItem>
+                      <SelectItem value="Govt. Land Encroachment">Govt. Land Encroachment</SelectItem>
+                      <SelectItem value="Others">Others</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="complaintPriority" className="text-sm font-semibold text-gray-700 flex items-center">
+                    <Calendar className="h-4 w-4 mr-2 text-purple-500" />
+                    Priority
+                  </Label>
+                  <Select value={formData.complaintPriority} onValueChange={(value) => handleInputChange('complaintPriority', value)}>
+                    <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="LOW">Low</SelectItem>
+                      <SelectItem value="NORMAL">Normal</SelectItem>
+                      <SelectItem value="HIGH">High</SelectItem>
+                      <SelectItem value="URGENT">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="placeOfComplaint" className="text-sm font-semibold text-gray-700 flex items-center">
+                  <MapPin className="h-4 w-4 mr-2 text-green-500" />
+                  Place of Complaint
+                  <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <Input
+                  id="placeOfComplaint"
+                  value={formData.placeOfComplaint}
+                  onChange={(e) => handleInputChange('placeOfComplaint', e.target.value)}
+                  placeholder="Location where incident occurred"
+                  required
+                  className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="addressOfComplaintPlace" className="text-sm font-semibold text-gray-700 flex items-center">
+                  <MapPin className="h-4 w-4 mr-2 text-blue-500" />
+                  Address of Complaint Place
+                </Label>
+                <Textarea
+                  id="addressOfComplaintPlace"
+                  value={formData.addressOfComplaintPlace}
+                  onChange={(e) => handleInputChange('addressOfComplaintPlace', e.target.value)}
+                  placeholder="Detailed address of the incident location"
+                  rows={2}
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="briefDetailsOfTheComplaint" className="text-sm font-semibold text-gray-700 flex items-center">
+                  <FileText className="h-4 w-4 mr-2 text-orange-500" />
+                  Brief Details of the Complaint
+                  <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <Textarea
+                  id="briefDetailsOfTheComplaint"
+                  value={formData.briefDetailsOfTheComplaint}
+                  onChange={(e) => handleInputChange('briefDetailsOfTheComplaint', e.target.value)}
+                  placeholder="Describe what happened"
+                  rows={4}
+                  required
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="detailsOfRespondent" className="text-sm font-semibold text-gray-700 flex items-center">
+                  <UserIcon className="h-4 w-4 mr-2 text-red-500" />
+                  Details of Respondent
+                </Label>
+                <Textarea
+                  id="detailsOfRespondent"
+                  value={formData.detailsOfRespondent}
+                  onChange={(e) => handleInputChange('detailsOfRespondent', e.target.value)}
+                  placeholder="Information about the person/party against whom complaint is made"
+                  rows={3}
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="attachments" className="text-sm font-semibold text-gray-700 flex items-center">
+                  <FileText className="h-4 w-4 mr-2 text-purple-500" />
+                  Attachments
+                </Label>
+                <Input
+                  id="attachments"
+                  type="file"
+                  multiple
+                  onChange={handleAttachmentsChange}
+                  className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100"
+                />
+                <p className="text-xs text-gray-500">
+                  You can upload supporting documents, images, or PDFs. (Optional)
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="sourceOfComplaint" className="text-sm font-semibold text-gray-700 flex items-center">
+                    <Phone className="h-4 w-4 mr-2 text-green-500" />
+                    Source of Complaint
+                  </Label>
+                  <Select value={formData.sourceOfComplaint} onValueChange={(value) => handleInputChange('sourceOfComplaint', value)}>
+                    <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                      <SelectValue placeholder="How did you hear about this?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="DIRECT">Direct</SelectItem>
+                      <SelectItem value="PHONE">Phone</SelectItem>
+                      <SelectItem value="EMAIL">Email</SelectItem>
+                      <SelectItem value="ONLINE">Online Portal</SelectItem>
+                      <SelectItem value="WALK_IN">Walk-in</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="modeOfComplaint" className="text-sm font-semibold text-gray-700 flex items-center">
+                    <FileText className="h-4 w-4 mr-2 text-indigo-500" />
+                    Mode of Complaint
+                  </Label>
+                  <Select value={formData.modeOfComplaint} onValueChange={(value) => handleInputChange('modeOfComplaint', value)}>
+                    <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                      <SelectValue placeholder="How was complaint received?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="WRITTEN">Written</SelectItem>
+                      <SelectItem value="VERBAL">Verbal</SelectItem>
+                      <SelectItem value="ONLINE">Online</SelectItem>
+                      <SelectItem value="PHONE">Phone</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Complainant Details */}
+        <Card className="border bg-white">
+          <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-t-lg border-b py-2">
+            <div className="flex items-center space-x-2">
+              <div className="p-1.5 bg-green-100 rounded-lg">
+                <UserIcon className="h-4 w-4 text-green-600" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-medium text-gray-800">Complainant Details</CardTitle>
+                <p className="text-xs text-gray-600">Your contact information for follow-up</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="nameOfTheComplainant" className="text-sm font-semibold text-gray-700 flex items-center">
+                    <UserIcon className="h-4 w-4 mr-2 text-blue-500" />
+                    Name of the Complainant
+                    <span className="text-red-500 ml-1">*</span>
+                  </Label>
+                  <Input
+                    id="nameOfTheComplainant"
+                    value={formData.nameOfTheComplainant}
+                    onChange={(e) => handleInputChange('nameOfTheComplainant', e.target.value)}
+                    placeholder="Full name of the complainant"
+                    required
+                    className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phoneOfTheComplainant" className="text-sm font-semibold text-gray-700 flex items-center">
+                    <Phone className="h-4 w-4 mr-2 text-green-500" />
+                    Phone Number
+                  </Label>
+                  <Input
+                    id="phoneOfTheComplainant"
+                    value={formData.phoneOfTheComplainant}
+                    onChange={(e) => handleInputChange('phoneOfTheComplainant', e.target.value)}
+                    placeholder="Contact phone number"
+                    type="tel"
+                    className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="addressOfTheComplainant" className="text-sm font-semibold text-gray-700 flex items-center">
+                  <MapPin className="h-4 w-4 mr-2 text-orange-500" />
+                  Address of the Complainant
+                </Label>
+                <Textarea
+                  id="addressOfTheComplainant"
+                  value={formData.addressOfTheComplainant}
+                  onChange={(e) => handleInputChange('addressOfTheComplainant', e.target.value)}
+                  placeholder="Complete address of the complainant"
+                  rows={3}
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Form Actions */}
+        <div className="bg-gray-50 rounded-lg p-6 mt-8">
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              <p>* Required fields must be filled</p>
+            </div>
+            <div className="flex gap-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={onCancel}
+                className="px-6 py-2 h-11 border-gray-300 hover:bg-gray-50"
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={loading}
+                className="px-8 py-2 h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                {loading ? (
+                  <div className="flex items-center">
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    <FileText className="h-4 w-4 mr-2" />
+                    {complaint ? 'Update Complaint' : 'Create New Complaint'}
+                  </div>
+                )}
+              </Button>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="placeOfComplaint">Place of Complaint *</Label>
-            <Input
-              id="placeOfComplaint"
-              value={formData.placeOfComplaint}
-              onChange={(e) => handleInputChange('placeOfComplaint', e.target.value)}
-              placeholder="Location where incident occurred"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="addressOfComplaintPlace">Address of Complaint Place</Label>
-            <Textarea
-              id="addressOfComplaintPlace"
-              value={formData.addressOfComplaintPlace}
-              onChange={(e) => handleInputChange('addressOfComplaintPlace', e.target.value)}
-              placeholder="Detailed address of the incident location"
-              rows={2}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="briefDetailsOfTheComplaint">Brief Details of the Complaint *</Label>
-            <Textarea
-              id="briefDetailsOfTheComplaint"
-              value={formData.briefDetailsOfTheComplaint}
-              onChange={(e) => handleInputChange('briefDetailsOfTheComplaint', e.target.value)}
-              placeholder="Describe what happened"
-              rows={4}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="detailsOfRespondent">Details of Respondent</Label>
-            <Textarea
-              id="detailsOfRespondent"
-              value={formData.detailsOfRespondent}
-              onChange={(e) => handleInputChange('detailsOfRespondent', e.target.value)}
-              placeholder="Information about the person/party against whom complaint is made"
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="attachments">Attachments</Label>
-            <Input
-              id="attachments"
-              type="file"
-              multiple
-              onChange={handleAttachmentsChange}
-            />
-            <p className="text-xs text-muted-foreground">
-              You can upload supporting documents, images, or PDFs. (Optional)
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="sourceOfComplaint">Source of Complaint</Label>
-              <Select value={formData.sourceOfComplaint} onValueChange={(value) => handleInputChange('sourceOfComplaint', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="How did you hear about this?" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DIRECT">Direct</SelectItem>
-                  <SelectItem value="PHONE">Phone</SelectItem>
-                  <SelectItem value="EMAIL">Email</SelectItem>
-                  <SelectItem value="ONLINE">Online Portal</SelectItem>
-                  <SelectItem value="WALK_IN">Walk-in</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="modeOfComplaint">Mode of Complaint</Label>
-              <Select value={formData.modeOfComplaint} onValueChange={(value) => handleInputChange('modeOfComplaint', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="How was complaint received?" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="WRITTEN">Written</SelectItem>
-                  <SelectItem value="VERBAL">Verbal</SelectItem>
-                  <SelectItem value="ONLINE">Online</SelectItem>
-                  <SelectItem value="PHONE">Phone</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Complainant Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Complainant Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="nameOfTheComplainant">Name of the Complainant *</Label>
-              <Input
-                id="nameOfTheComplainant"
-                value={formData.nameOfTheComplainant}
-                onChange={(e) => handleInputChange('nameOfTheComplainant', e.target.value)}
-                placeholder="Full name of the complainant"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phoneOfTheComplainant">Phone Number</Label>
-              <Input
-                id="phoneOfTheComplainant"
-                value={formData.phoneOfTheComplainant}
-                onChange={(e) => handleInputChange('phoneOfTheComplainant', e.target.value)}
-                placeholder="Contact phone number"
-                type="tel"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="addressOfTheComplainant">Address of the Complainant</Label>
-            <Textarea
-              id="addressOfTheComplainant"
-              value={formData.addressOfTheComplainant}
-              onChange={(e) => handleInputChange('addressOfTheComplainant', e.target.value)}
-              placeholder="Complete address of the complainant"
-              rows={3}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Form Actions */}
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={loading}>
-          {loading ? 'Saving...' : (complaint ? 'Update Complaint' : 'Create Complaint')}
-        </Button>
-      </div>
-    </form>
+        </div>
+      </form>
+    </div>
   );
 }
